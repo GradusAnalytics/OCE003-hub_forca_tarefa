@@ -1166,6 +1166,7 @@ async function carregarDecisoesDoBanco() {
 
 
   window.pmiCarregarSnapshot = carregarSnapshot;
+  window.carregarBaseAcesso = function(){ return carregarBaseAcesso(); };
 
   // ── Carrega base de gestão de acesso via Excel no S3 ──
   async function carregarBaseAcesso(){
