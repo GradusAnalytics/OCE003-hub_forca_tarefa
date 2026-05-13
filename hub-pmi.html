@@ -1396,7 +1396,7 @@ async function carregarDecisoesDoBanco() {
     document.getElementById('pg-resumo').innerHTML = resumoCardsFT(f) + panelFT(f,false) + resumoTableFT(f);
   };
   window.renderHub=function(){
-    var panels=(DATA.fts||[]).map(function(f){return panelFT(f,true)}).join('');
+    var panels=(DATA.fts||[]).filter(function(f){return canViewFT(f.nome);}).map(function(f){return panelFT(f,true)}).join('');
     document.getElementById('pg-hub').innerHTML = hubCards() + '<div class="hub-panels">'+panels+'</div>' + hubResumoTable();
     document.querySelectorAll('.acp-panel').forEach(function(p,i){p.style.cursor='pointer';p.addEventListener('click',function(){var f=(DATA.fts||[])[i]; if(f) openFT(f.nome);});});
   };
@@ -1454,7 +1454,12 @@ async function carregarDecisoesDoBanco() {
   function ftCard(f){return '<div class="ftcard" data-ft="'+esc(f.nome)+'"><div class="fttitle">FT '+esc(f.nome)+'</div><div class="ftmeta"><b>'+pct1(ftProcProgress(f))+'</b> de avanço geral · <b>'+pct1(ftProcPrioProgress(f))+'</b> prioritários<br>'+procBase(f).length+' processos · '+(f.total_questoes||qList(f).length)+' questões · '+finalizadosPrio(f)+' prioritários finalizados<br>'+((f.processos_com_contraste!=null?f.processos_com_contraste:procAll(f).filter(function(p){return Object.keys(p.dimensoes||{}).length||(p.linhas||[]).length||(typeof procHasPptResumo==='function'&&procHasPptResumo(p));}).length))+' processos com contraste</div><div class="progbg" style="margin-top:12px"><div class="progfill" style="width:'+ftProcProgress(f)+'%"></div></div></div>';}
 
   window.renderHub=function(){
-    var fts=DATA.fts||[];
+    // Filtra FTs visíveis para o usuário atual
+    var fts=(DATA.fts||[]).filter(function(f){ return canViewFT(f.nome); });
+    if(PPR_USER && !isGradusUser() && PMI_ACCESS_LOADED && !getUserRows().length){
+      document.getElementById('pg-hub').innerHTML='<div class="ins" style="border-left-color:#800000;text-align:center;padding:48px 24px"><div style="font-size:40px;margin-bottom:16px">🔒</div><strong style="font-size:18px;color:#800000">Acesso não configurado</strong><br><br><span style="color:#4A5E73;font-size:14px">Procure o administrador para cadastrar suas permissões.</span></div>';
+      return;
+    }
     var allProc=fts.flatMap(procBase), allPrio=allProc.filter(isPrio);
     var procProg=metaPct(['progresso_geral','progresso'],avg(fts.map(ftProcProgress)));
     var procPrioProg=metaPct(['progresso_geral_priorizado_ponderado','progresso_geral_priorizado','progresso_priorizados','progresso_prioritarios'],avg(fts.map(ftProcPrioProgress).filter(function(v){return v||v===0;})));
