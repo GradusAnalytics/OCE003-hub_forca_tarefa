@@ -1218,15 +1218,17 @@ async function carregarDecisoesDoBanco() {
       }
       PMI_ACCESS_LOADED = true;
 
-      // Se usuário não está no sistema e não é Gradus, exibe aviso
+      // Re-renderiza hub para qualquer usuário não-Gradus após carregar a base de acesso
+      // (necessário porque o hub foi renderizado inicialmente com PPR_USER=null, sem filtros)
       if(PPR_USER && !isGradusUser()){
         var userRows = getUserRows();
         if(!userRows.length){
           setHub('<div class="ins" style="border-left-color:#800000;text-align:center;padding:48px 24px"><div style="font-size:40px;margin-bottom:16px">🔒</div><strong style="font-size:18px;color:#800000">Acesso não configurado</strong><br><br><span style="color:#4A5E73;font-size:14px">Procure o administrador para cadastrar suas permissões.</span></div>');
           return;
         }
-        // Re-renderiza hub com FTs filtradas
+        // Sempre re-renderiza para aplicar filtro de FTs visíveis
         if(typeof renderHub === 'function') renderHub();
+        if(typeof setHeader === 'function') setHeader(null);
       }
 
     }catch(e){
