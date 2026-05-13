@@ -66,6 +66,33 @@
 </head><body>
 <script>
 var DATA = {"meta":{"titulo":"PMI OceanPact × CBO","total_fts":0,"progresso_geral":0,"total_questoes":0,"total_processos":0},"fts":[]};
+
+// ── PPR Bridge: usuário logado ──
+var PPR_USER = null;
+var PPR_DECISION_EMAIL_EDITOR   = 'joao.madeira@gradusconsultoria.com.br';
+var PPR_DECISION_EMAIL_VIEWER   = 'alienware2@gradusconsultoria.com.br';
+
+function pprCanEdit() {
+  if (!PPR_USER) return true; // fora do PPR: permite tudo (standalone)
+  return PPR_USER.email === PPR_DECISION_EMAIL_EDITOR;
+}
+function pprCanView() {
+  if (!PPR_USER) return true;
+  return PPR_USER.email === PPR_DECISION_EMAIL_EDITOR || PPR_USER.email === PPR_DECISION_EMAIL_VIEWER;
+}
+
+window.addEventListener('message', function(event) {
+  if (!event.data || event.data.type !== 'ppr.init') return;
+  PPR_USER = event.data.payload && event.data.payload.user ? event.data.payload.user : null;
+  // Re-renderiza painel de decisões se estiver aberto
+  try {
+    var pg = document.getElementById('pg-decisoes');
+    if (pg && pg.classList.contains('active') && typeof renderDecisoes === 'function') renderDecisoes();
+  } catch(e) {}
+});
+
+// Sinaliza ao PPR que a ferramenta está pronta
+try { window.parent.postMessage({ type: 'ppr.ready' }, '*'); } catch(e) {}
 const PMI_SNAPSHOTS_API = "https://hgelha26b4.execute-api.us-east-1.amazonaws.com";
 const PMI_API_TOKEN = "pmi-token-2026";
 </script><div class="hdr"><div class="hdr-l"><span class="ht">GRADUS</span><div class="hdr-sep"></div><span class="ht" style="font-weight:600">Integração OceanPact + CBO</span><span class="hs" id="h-current">› Hub Multi-FT</span></div><div class="hdr-r"><button class="xbtn sec" id="btn-hub" onclick="(function(){try{currentFT=null;var tb=document.getElementById('tabbar');if(tb)tb.style.display='none';document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var ph=document.getElementById('pg-hub');if(ph)ph.classList.add('active');if(typeof renderHub==='function')renderHub();if(typeof setHeader==='function')setHeader(null);if(typeof populateSelect==='function'&&typeof _allSnapshots!=='undefined'&&_allSnapshots.length)populateSelect(_allSnapshots,_activeSnapshotKey);}catch(e){alert('Erro Hub: '+e.message);}})()">🏠 Hub</button><span class="hbadge">PMI · Projeto América</span>
@@ -316,7 +343,17 @@ function pptResumoRowsHtml(p, withOwner){
     let item=r.item||'Item analisado';
     let origem=String(r.origem||'Mix').trim();
     let origemCls=origem==='OCP'?'oOCP':(origem==='CBO'?'oCBO':'oMix');
-    let owner=withOwner?'<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Obrigatório em caso de reprovação: descreva a sugestão para a Força-Tarefa trabalhar."></textarea><textarea class="dcobs" placeholder="Observações adicionais..."></textarea></div></td>':'';
+    let ownerCellContent = '';
+    if(withOwner){
+      if(pprCanEdit()){
+        // Editor: pode aprovar, reprovar e comentar
+        ownerCellContent = '<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Obrigatório em caso de reprovação: descreva a sugestão para a Força-Tarefa trabalhar."></textarea><textarea class="dcobs" placeholder="Observações adicionais..."></textarea></div></td>';
+      } else {
+        // Viewer: só visualiza o estado atual (readonly)
+        ownerCellContent = '<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1" disabled style="opacity:.6;cursor:not-allowed">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1" disabled style="opacity:.6;cursor:not-allowed">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Sugestão da Força-Tarefa." readonly style="background:#f8f8f8;color:#666;cursor:default"></textarea><textarea class="dcobs" placeholder="Observações..." readonly style="background:#f8f8f8;color:#666;cursor:default"></textarea></div></td>';
+      }
+    }
+    let owner=ownerCellContent;
     return '<tr><td class="ppt-td-item '+sizeClass(item)+'"><b>'+esc(item)+'</b></td><td class="ppt-td-ocp '+sizeClass(r.ocp)+'">'+bulletHtml(r.ocp,'var(--lt2)')+'</td><td class="ppt-td-cbo '+sizeClass(r.cbo)+'">'+bulletHtml(r.cbo,'var(--a1)')+'</td><td class="ppt-td-nc '+sizeClass(r.sugestao)+'">'+bulletHtml(r.sugestao,'#007833')+'</td><td class="ppt-td-orig"><span class="orig '+origemCls+'">'+esc(origem||'Mix')+'</span></td>'+owner+'</tr>';
   }).join('');
 }
@@ -362,8 +399,8 @@ function renderDecisionTable(){
   let wrap=document.getElementById('dc-list');
   if(wrap){wrap.innerHTML=html;}
   let root=wrap||document.getElementById('pg-decisoes');
-  root.querySelectorAll('.dcr-btn').forEach(btn=>btn.addEventListener('click',function(){let rk=this.dataset.rk,r=this.dataset.r;let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;let novaResposta=(_dcLinhas[idx].resposta===r)?'':r;_dcLinhas[idx].resposta=novaResposta;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:novaResposta,alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});renderDecisionTable();}));
-  root.addEventListener('blur',function(ev){let ta=ev.target;if(!ta.id)return;if(ta.id.startsWith('alt_')||ta.id.startsWith('obs_')){let rk=ta.id.replace(/^alt_|^obs_/,'');let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;if(ta.id.startsWith('alt_'))_dcLinhas[idx].alternativa=ta.value;else _dcLinhas[idx].obs=ta.value;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:_dcLinhas[idx].resposta||'',alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});}},true);
+  root.querySelectorAll('.dcr-btn').forEach(btn=>btn.addEventListener('click',function(){if(!pprCanEdit()||this.disabled) return;let rk=this.dataset.rk,r=this.dataset.r;let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;let novaResposta=(_dcLinhas[idx].resposta===r)?'':r;_dcLinhas[idx].resposta=novaResposta;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:novaResposta,alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});renderDecisionTable();}));
+  root.addEventListener('blur',function(ev){if(!pprCanEdit()) return;let ta=ev.target;if(!ta.id)return;if(ta.id.startsWith('alt_')||ta.id.startsWith('obs_')){let rk=ta.id.replace(/^alt_|^obs_/,'');let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;if(ta.id.startsWith('alt_'))_dcLinhas[idx].alternativa=ta.value;else _dcLinhas[idx].obs=ta.value;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:_dcLinhas[idx].resposta||'',alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});}},true);
 }
 function renderRaci(){let f=currentFT;document.getElementById('pg-raci').innerHTML=`<div class="ins"><strong>RACI To-be</strong> — use esta matriz para registrar papéis e responsabilidades da NewCo por processo e etapa. As colunas representam as Forças-Tarefa e o preenchimento deve refletir decisões validadas em workshop, evitando assumir responsabilidades ainda não acordadas.</div>${processFilterHtml('raci-proc-filter',f)}<div class="raci-table-wrap"><table id="raci-tbl" class="raci-table"></table></div>`;let render=()=>{let v=document.getElementById('raci-proc-filter').value;let ps=orderedStatusQCProcesses(f).filter(p=>v==='Todos'||p.nome===v);let opts=['','R','A','C','I','R/A','R/C','R/I','A/C','A/I','C/I','R/A/C','R/A/I','R/C/I','A/C/I','R/A/C/I'];document.getElementById('raci-tbl').innerHTML=`<thead><tr><th>Processo / etapa</th><th>Etapa</th><th>Subetapa / observação</th><th>Decisão?</th>${FTS_RACI.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${ps.flatMap(p=>{let etapas=p.etapas&&p.etapas.length?p.etapas:['Etapa a detalhar'];let group=`<tr class="raci-group-row"><td colspan="${4+FTS_RACI.length}">${esc(p.nome)} <span class="sticky-note">· ${etapas.length} etapas · ${(p.questoes||[]).length||0} questões</span></td></tr>`;let rows=etapas.map((e,idx)=>`<tr><td><b>${idx===0?esc(p.nome):''}</b></td><td>${esc(e)}</td><td><input class="raci-input" placeholder="Adicionar subetapa, se necessário"></td><td><select class="raci-decision"><option>Não</option><option>Sim</option></select></td>${FTS_RACI.map(()=>`<td><select class="raci-select">${opts.map(o=>`<option>${o||'—'}</option>`).join('')}</select></td>`).join('')}</tr>`);return [group,...rows]}).join('')}</tbody>`};document.getElementById('raci-proc-filter').onchange=render;render();}
 function downloadRows(rows,filename){let csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=filename;a.click();}
