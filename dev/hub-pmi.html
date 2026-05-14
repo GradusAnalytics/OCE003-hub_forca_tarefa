@@ -66,6 +66,88 @@
 </head><body>
 <script>
 var DATA = {"meta":{"titulo":"PMI OceanPact × CBO","total_fts":0,"progresso_geral":0,"total_questoes":0,"total_processos":0},"fts":[]};
+
+// ── PPR Bridge: usuário logado ──
+var PPR_USER = null;
+
+// ── Controle de acesso ──
+var PMI_ACCESS_DB = null; // linhas da base de gestão de acesso (carregada do Excel)
+var PMI_ACCESS_LOADED = false;
+var GRADUS_DOMAIN = '@gradusconsultoria.com.br';
+
+function isGradusUser() {
+  if (!PPR_USER) return true; // standalone: sem restrição
+  return PPR_USER.email && PPR_USER.email.endsWith(GRADUS_DOMAIN);
+}
+
+// Retorna array de objetos {nome, email, empresa, perfil, forca_tarefa} para o usuário logado
+function getUserRows() {
+  if (!PPR_USER || !PMI_ACCESS_DB) return [];
+  var email = (PPR_USER.email || '').toLowerCase().trim();
+  return PMI_ACCESS_DB.filter(function(r) {
+    return (r.email || '').toLowerCase().trim() === email;
+  });
+}
+
+// Pode ver uma FT?
+function canViewFT(ftNome) {
+  if (!PPR_USER) return true;
+  if (isGradusUser()) return true;
+  if (!PMI_ACCESS_LOADED) return false;
+  var rows = getUserRows();
+  if (!rows.length) return false;
+  return rows.some(function(r) {
+    return normFT(r.forca_tarefa) === 'todas' || normFT(r.forca_tarefa) === normFT(ftNome);
+  });
+}
+
+// Pode editar uma FT? (Gradus ou Dono/Líder)
+function canEditFT(ftNome) {
+  if (!PPR_USER) return true;
+  if (isGradusUser()) return true;
+  if (!PMI_ACCESS_LOADED) return false;
+  var rows = getUserRows();
+  return rows.some(function(r) {
+    var perfil = (r.perfil || '').trim();
+    return (normFT(r.forca_tarefa) === 'todas' || normFT(r.forca_tarefa) === normFT(ftNome)) &&
+           (perfil === 'Dono' || perfil === 'Líder');
+  });
+}
+
+function normFT(nome) {
+  return (nome || '').toLowerCase().trim()
+    .replace(/\s*\/\s*/g, '/')  // normaliza espaços ao redor de barra: "a / b" → "a/b"
+    .replace(/\s+/g, ' ');
+}
+
+// Compatibilidade com código anterior do painel de decisões
+function pprCanEdit() {
+  if (!currentFT) return canEditFT('');
+  return canEditFT(currentFT.nome);
+}
+function pprCanView() {
+  if (!currentFT) return true;
+  return canViewFT(currentFT.nome);
+}
+
+// Exibe mensagem de acesso negado na FT
+function renderAccessDenied(msg) {
+  msg = msg || 'Você não tem permissão para visualizar esta Força-Tarefa.';
+  ['pg-resumo','pg-qc','pg-progresso','pg-contraste','pg-decisoes','pg-raci'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="ins" style="border-left-color:#800000;text-align:center;padding:40px 24px"><div style="font-size:32px;margin-bottom:16px">🔒</div><strong style="font-size:16px;color:#800000">Acesso não permitido</strong><br><br><span style="color:#4A5E73">'+msg+'</span></div>';
+  });
+}
+
+window.addEventListener('message', function(event) {
+  if (!event.data || event.data.type !== 'ppr.init') return;
+  PPR_USER = event.data.payload && event.data.payload.user ? event.data.payload.user : null;
+  // Carrega base de acesso após receber o usuário
+  carregarBaseAcesso();
+});
+
+// Sinaliza ao PPR que a ferramenta está pronta
+try { window.parent.postMessage({ type: 'ppr.ready' }, '*'); } catch(e) {}
 const PMI_SNAPSHOTS_API = "https://hgelha26b4.execute-api.us-east-1.amazonaws.com";
 const PMI_API_TOKEN = "pmi-token-2026";
 </script><div class="hdr"><div class="hdr-l"><span class="ht">GRADUS</span><div class="hdr-sep"></div><span class="ht" style="font-weight:600">Integração OceanPact + CBO</span><span class="hs" id="h-current">› Hub Multi-FT</span></div><div class="hdr-r"><button class="xbtn sec" id="btn-hub" onclick="(function(){try{currentFT=null;var tb=document.getElementById('tabbar');if(tb)tb.style.display='none';document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var ph=document.getElementById('pg-hub');if(ph)ph.classList.add('active');if(typeof renderHub==='function')renderHub();if(typeof setHeader==='function')setHeader(null);if(typeof populateSelect==='function'&&typeof _allSnapshots!=='undefined'&&_allSnapshots.length)populateSelect(_allSnapshots,_activeSnapshotKey);}catch(e){alert('Erro Hub: '+e.message);}})()">🏠 Hub</button><span class="hbadge">PMI · Projeto América</span>
@@ -118,7 +200,16 @@ function finalizadosPrioritariosCount(f){return (f.processos||[]).filter(p=>prio
 function sourcePptBadge(p){return p&&p.ppt_text?'<span class="ppt-source-note">Resumo do PPT</span>':'';}
 function priorityBadge(p){return prioridadeProcesso(p)?'<span class="prio-badge">Prioritário</span>':'<span class="prio-badge low">Backlog</span>';}
 
-function renderHub(){let m=DATA.meta;let prioProc=DATA.fts.reduce((a,f)=>a+(f.processos||[]).filter(prioridadeProcesso).length,0);let prioDone=DATA.fts.reduce((a,f)=>a+finalizadosPrioritariosCount(f),0);let prioProgress=calcProgressProcessList(DATA.fts.flatMap(f=>(f.processos||[]).filter(prioridadeProcesso)));let geralProgress=calcProgressProcessList(DATA.fts.flatMap(f=>f.processos||[]));document.getElementById('pg-hub').innerHTML=`<div class="execdash"><div class="exec-hero"><div><div class="exec-eyebrow">Projeto América · Hub de Forças-Tarefa</div><div class="exec-title">Status consolidado do PMI por Força-Tarefa</div><div class="exec-copy">Camada inicial para navegar entre FTs, consolidar avanço geral e avanço dos processos prioritários, preservando dentro de cada FT a estrutura funcional: resumo, processos & questões, status, contraste, decisões e RACI To-be.</div></div><div class="exec-bigrow"><div class="exec-big"><div class="exec-big-val">${pct(geralProgress||m.progresso_geral)}</div><div class="exec-big-lbl">Avanço geral</div></div><div class="exec-big"><div class="exec-big-val">${pct(prioProgress)}</div><div class="exec-big-lbl">Avanço prioritários</div></div></div></div><div class="exec-metrics"><div class="exec-card blue"><div class="exec-card-val">${m.total_processos}</div><div class="exec-card-lbl">Processos</div><div class="exec-card-sub">Total consolidado mapeado nos arquivos</div></div><div class="exec-card orange"><div class="exec-card-val">${m.total_questoes}</div><div class="exec-card-lbl">Questões-chave</div><div class="exec-card-sub">Base agregada das FTs carregadas</div></div><div class="exec-card green"><div class="exec-card-val">${DATA.fts.reduce((a,f)=>a+finalizadosCount(f),0)}</div><div class="exec-card-lbl">Finalizados / validados</div><div class="exec-card-sub">Processos em estágio final</div></div><div class="exec-card red"><div class="exec-card-val">${prioDone}/${prioProc}</div><div class="exec-card-lbl">Prioritários finalizados</div><div class="exec-card-sub">Base ordenada primeiro nas visões</div></div></div></div><div class="hubgrid">${DATA.fts.map(f=>`<div class="ftcard" data-ft="${esc(f.nome)}"><div class="fttitle">FT ${esc(f.nome)}</div><div class="ftmeta"><b>${pct(f.progresso)}</b> de avanço geral · <b>${pct(priorityProgress(f))}</b> prioritários<br>${f.total_processos} processos · ${f.total_questoes} questões · ${finalizadosPrioritariosCount(f)} prioritários finalizados<br>${f.processos_com_contraste} processos com contraste</div><div class="progbg" style="margin-top:12px"><div class="progfill" style="width:${f.progresso}%"></div></div></div>`).join('')}</div><div class="twrap"><table class="tbl"><thead><tr><th>FT</th><th>Avanço geral</th><th>Avanço prioritários</th><th>Prioritários finalizados</th><th>Finalizados / validados</th><th>Não iniciado</th><th>Iniciado</th><th>Questões</th><th>Processos</th></tr></thead><tbody>${DATA.fts.map(f=>`<tr><td><b>FT ${esc(f.nome)}</b></td><td>${pct(f.progresso)}</td><td>${pct(priorityProgress(f))}</td><td>${finalizadosPrioritariosCount(f)}</td><td>${finalizadosCount(f)}</td><td>${f.status_counts['Não Iniciado']||0}</td><td>${f.status_counts['Iniciado']||0}</td><td>${f.total_questoes}</td><td>${f.total_processos}</td></tr>`).join('')}</tbody></table></div>`;document.querySelectorAll('.ftcard[data-ft]').forEach(card=>card.addEventListener('click',()=>openFT(card.dataset.ft)));}
+function renderHub(){
+  // Filtra FTs visíveis para o usuário atual
+  var visibleFts = (DATA.fts||[]).filter(function(f){ return canViewFT(f.nome); });
+  if(PPR_USER && !isGradusUser() && PMI_ACCESS_LOADED && !getUserRows().length){
+    document.getElementById('pg-hub').innerHTML='<div class="ins" style="border-left-color:#800000;text-align:center;padding:48px 24px"><div style="font-size:40px;margin-bottom:16px">🔒</div><strong style="font-size:18px;color:#800000">Acesso não configurado</strong><br><br><span style="color:#4A5E73;font-size:14px">Procure o administrador para cadastrar suas permissões.</span></div>';
+    return;
+  }
+  var _origFts = DATA.fts;
+  DATA.fts = visibleFts;
+  let m=DATA.meta;let prioProc=DATA.fts.reduce((a,f)=>a+(f.processos||[]).filter(prioridadeProcesso).length,0);let prioDone=DATA.fts.reduce((a,f)=>a+finalizadosPrioritariosCount(f),0);let prioProgress=calcProgressProcessList(DATA.fts.flatMap(f=>(f.processos||[]).filter(prioridadeProcesso)));let geralProgress=calcProgressProcessList(DATA.fts.flatMap(f=>f.processos||[]));document.getElementById('pg-hub').innerHTML=`<div class="execdash"><div class="exec-hero"><div><div class="exec-eyebrow">Projeto América · Hub de Forças-Tarefa</div><div class="exec-title">Status consolidado do PMI por Força-Tarefa</div><div class="exec-copy">Camada inicial para navegar entre FTs, consolidar avanço geral e avanço dos processos prioritários, preservando dentro de cada FT a estrutura funcional: resumo, processos & questões, status, contraste, decisões e RACI To-be.</div></div><div class="exec-bigrow"><div class="exec-big"><div class="exec-big-val">${pct(geralProgress||m.progresso_geral)}</div><div class="exec-big-lbl">Avanço geral</div></div><div class="exec-big"><div class="exec-big-val">${pct(prioProgress)}</div><div class="exec-big-lbl">Avanço prioritários</div></div></div></div><div class="exec-metrics"><div class="exec-card blue"><div class="exec-card-val">${m.total_processos}</div><div class="exec-card-lbl">Processos</div><div class="exec-card-sub">Total consolidado mapeado nos arquivos</div></div><div class="exec-card orange"><div class="exec-card-val">${m.total_questoes}</div><div class="exec-card-lbl">Questões-chave</div><div class="exec-card-sub">Base agregada das FTs carregadas</div></div><div class="exec-card green"><div class="exec-card-val">${DATA.fts.reduce((a,f)=>a+finalizadosCount(f),0)}</div><div class="exec-card-lbl">Finalizados / validados</div><div class="exec-card-sub">Processos em estágio final</div></div><div class="exec-card red"><div class="exec-card-val">${prioDone}/${prioProc}</div><div class="exec-card-lbl">Prioritários finalizados</div><div class="exec-card-sub">Base ordenada primeiro nas visões</div></div></div></div><div class="hubgrid">${DATA.fts.map(f=>`<div class="ftcard" data-ft="${esc(f.nome)}"><div class="fttitle">FT ${esc(f.nome)}</div><div class="ftmeta"><b>${pct(f.progresso)}</b> de avanço geral · <b>${pct(priorityProgress(f))}</b> prioritários<br>${f.total_processos} processos · ${f.total_questoes} questões · ${finalizadosPrioritariosCount(f)} prioritários finalizados<br>${f.processos_com_contraste} processos com contraste</div><div class="progbg" style="margin-top:12px"><div class="progfill" style="width:${f.progresso}%"></div></div></div>`).join('')}</div><div class="twrap"><table class="tbl"><thead><tr><th>FT</th><th>Avanço geral</th><th>Avanço prioritários</th><th>Prioritários finalizados</th><th>Finalizados / validados</th><th>Não iniciado</th><th>Iniciado</th><th>Questões</th><th>Processos</th></tr></thead><tbody>${DATA.fts.map(f=>`<tr><td><b>FT ${esc(f.nome)}</b></td><td>${pct(f.progresso)}</td><td>${pct(priorityProgress(f))}</td><td>${finalizadosPrioritariosCount(f)}</td><td>${finalizadosCount(f)}</td><td>${f.status_counts['Não Iniciado']||0}</td><td>${f.status_counts['Iniciado']||0}</td><td>${f.total_questoes}</td><td>${f.total_processos}</td></tr>`).join('')}</tbody></table></div>`;document.querySelectorAll('.ftcard[data-ft]').forEach(card=>card.addEventListener('click',()=>openFT(card.dataset.ft))); DATA.fts = _origFts; }
 function renderFT(){renderResumo();renderQC();renderProgresso();renderContraste();renderDecisoes();renderRaci();}
 function renderResumo(){let f=currentFT;let prio=(f.processos||[]).filter(prioridadeProcesso);let prioProg=priorityProgress(f);let done=finalizadosCount(f);let donePrio=finalizadosPrioritariosCount(f);document.getElementById('pg-resumo').innerHTML=`<div class="execdash"><div class="exec-hero"><div><div class="exec-eyebrow">FT ${esc(f.nome)} · Resumo Executivo</div><div class="exec-title">Avanço calculado por status dos processos</div><div class="exec-copy">Critério aplicado: não iniciado = 0%, iniciado = 25%, finalizado = 75% e validado = 100%. A visão separa avanço geral e avanço dos processos prioritários para orientar a validação com dono da FT e comitê.</div></div><div class="exec-bigrow"><div class="exec-big"><div class="exec-big-val">${pct(f.progresso)}</div><div class="exec-big-lbl">Avanço geral</div></div><div class="exec-big"><div class="exec-big-val">${pct(prioProg)}</div><div class="exec-big-lbl">Avanço prioritários</div></div></div></div><div class="exec-metrics"><div class="exec-card blue"><div class="exec-card-val">${f.total_questoes}</div><div class="exec-card-lbl">Questões-chave</div><div class="exec-card-sub">Base da FT</div></div><div class="exec-card orange"><div class="exec-card-val">${f.questoes_prioritarias}</div><div class="exec-card-lbl">Questões prioritárias</div><div class="exec-card-sub">Score ≥ 3</div></div><div class="exec-card green"><div class="exec-card-val">${done}</div><div class="exec-card-lbl">Finalizados / validados</div><div class="exec-card-sub">Processos com status final</div></div><div class="exec-card red"><div class="exec-card-val">${donePrio}/${prio.length}</div><div class="exec-card-lbl">Prioritários finalizados</div><div class="exec-card-sub">Base crítica para decisão</div></div><div class="exec-card"><div class="exec-card-val">${f.status_counts['Iniciado']||0}</div><div class="exec-card-lbl">Iniciados</div><div class="exec-card-sub">Peso 25%</div></div></div></div><div class="progwrap"><div class="progtitle">Avanço geral da FT</div><div class="progbg"><div class="progfill" style="width:${f.progresso}%"></div></div><div class="progtitle" style="margin-top:14px">Avanço dos processos prioritários</div><div class="progbg"><div class="progfill" style="width:${prioProg}%"></div></div><div class="proglbls"><div class="proglbl"><span class="pdot" style="background:#9DB1CF"></span>Não iniciado = 0%</div><div class="proglbl"><span class="pdot" style="background:#E68E18"></span>Iniciado = 25%</div><div class="proglbl"><span class="pdot" style="background:#296DB7"></span>Finalizado = 75%</div><div class="proglbl"><span class="pdot" style="background:#00B050"></span>Validado = 100%</div></div></div>`;}
 function processFilterHtml(id, f){let ps=orderedStatusQCProcesses(f);return `<div class="raci-controls"><span class="cpflbl">Processo:</span><select class="raci-filter" id="${id}"><option value="Todos">Todos os processos</option>${ps.map(p=>`<option>${esc(p.nome)}</option>`).join('')}</select><button class="cpfbtn" onclick="sortByName('${id}')">Ordenar A→Z</button></div>`}
@@ -301,7 +392,7 @@ function origemClass(o){return o==='OCP'?'oOCP':(o==='CBO'?'oCBO':'oMix');}
 function splitBulletsRaw(t){let txt=String(t||'').trim();if(!txt)return [];let lines=txt.split(/\n+/).map(x=>x.replace(/^\s*[•\-–]+\s*/,'').trim()).filter(Boolean);if(lines.length<=1){lines=txt.split(/(?<=[.;])\s+(?=[A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9])/).map(x=>x.trim()).filter(Boolean);}return lines.filter(Boolean);}
 function bulletHtml(t,color){let lines=splitBulletsRaw(t);if(!lines.length)return '<em style="color:#ccc;font-size:11px">—</em>';return lines.map(x=>'<div class="bullet-line" style="padding:2px 0 2px 14px;position:relative"><span style="position:absolute;left:3px;color:'+color+'">•</span>'+esc(x)+'</div>').join('');}
 function conciseBulletHtml(t,color){let lines=splitBulletsRaw(t);if(!lines.length)return '<em style="color:#ccc;font-size:11px">—</em>';let max=3;let out=lines.slice(0,max).map(x=>{x=x.replace(/\s+/g,' ').trim();return x.length>190?x.slice(0,187).trim()+'...':x;});return out.map(x=>'<div class="bullet-line" style="padding:2px 0 2px 14px;position:relative"><span style="position:absolute;left:3px;color:'+color+'">•</span>'+esc(x)+'</div>').join('');}
-function summaryHtml(t,color,isPpt){return bulletHtml(t,color);}
+function summaryHtml(t,color,isPpt){return isPpt?bulletHtml(t,color):conciseBulletHtml(t,color);}
 
 function procHasPptResumo(p){return Array.isArray(p&&p.ppt_rows)&&p.ppt_rows.some(r=>r&&(r.is_official_ppt_summary===true||r.source_type==='ppt_official'||r.fonte==='ppt_oficial'));}
 function procHasPptFallback(p){return Array.isArray(p&&p.ppt_rows)&&p.ppt_rows.some(r=>r&&(r.source_type==='contrast_mirror_fallback'||r.fonte==='contraste_mirror_for_ppt_absent'||r.fonte==='contraste_mirror_for_decision_panel'));}
@@ -316,7 +407,17 @@ function pptResumoRowsHtml(p, withOwner){
     let item=r.item||'Item analisado';
     let origem=String(r.origem||'Mix').trim();
     let origemCls=origem==='OCP'?'oOCP':(origem==='CBO'?'oCBO':'oMix');
-    let owner=withOwner?'<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Obrigatório em caso de reprovação: descreva a sugestão para a Força-Tarefa trabalhar."></textarea><textarea class="dcobs" placeholder="Observações adicionais..."></textarea></div></td>':'';
+    let ownerCellContent = '';
+    if(withOwner){
+      if(pprCanEdit()){
+        // Editor: pode aprovar, reprovar e comentar
+        ownerCellContent = '<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Obrigatório em caso de reprovação: descreva a sugestão para a Força-Tarefa trabalhar."></textarea><textarea class="dcobs" placeholder="Observações adicionais..."></textarea></div></td>';
+      } else {
+        // Viewer: só visualiza o estado atual (readonly)
+        ownerCellContent = '<td class="dc-owner-cell"><div class="dc-resp"><div class="dc-resp-btns"><button class="dcr-btn agree" data-ppt-owner="1" disabled style="opacity:.6;cursor:not-allowed">✓ Aprovar</button><button class="dcr-btn disagree" data-ppt-owner="1" disabled style="opacity:.6;cursor:not-allowed">✗ Reprovar</button></div><textarea class="dcr-textarea" placeholder="Sugestão da Força-Tarefa." readonly style="background:#f8f8f8;color:#666;cursor:default"></textarea><textarea class="dcobs" placeholder="Observações..." readonly style="background:#f8f8f8;color:#666;cursor:default"></textarea></div></td>';
+      }
+    }
+    let owner=ownerCellContent;
     return '<tr><td class="ppt-td-item '+sizeClass(item)+'"><b>'+esc(item)+'</b></td><td class="ppt-td-ocp '+sizeClass(r.ocp)+'">'+bulletHtml(r.ocp,'var(--lt2)')+'</td><td class="ppt-td-cbo '+sizeClass(r.cbo)+'">'+bulletHtml(r.cbo,'var(--a1)')+'</td><td class="ppt-td-nc '+sizeClass(r.sugestao)+'">'+bulletHtml(r.sugestao,'#007833')+'</td><td class="ppt-td-orig"><span class="orig '+origemCls+'">'+esc(origem||'Mix')+'</span></td>'+owner+'</tr>';
   }).join('');
 }
@@ -327,7 +428,7 @@ function linhasPorEtapa(p){let out={},names={};(p.linhas||[]).forEach(l=>{let ra
 const DIM_CLS={'Atividades':'da','Critérios de decisão e políticas':'dc','Sistemas':'ds','Indicadores de desempenho / métricas':'di','Áreas envolvidas na execução':'dae'};
 let _dcFiltro='Todos', _dcAsc=true, _dcLinhas=[], _dcProcOrder={};
 function dcKey(ft,proc,dim){return 'pmi_dc_v16_'+String(ft).replace(/[^a-z0-9]/gi,'_')+'_'+String(proc).replace(/[^a-z0-9]/gi,'_')+'_'+String(dim).replace(/[^a-z0-9]/gi,'_');}
-function getSavedDecision(ft,proc,dim){let k=dcKey(ft,proc,dim);try{if(PMI_DECISION_BACKUP&&PMI_DECISION_BACKUP[k])return PMI_DECISION_BACKUP[k];let ls=localStorage.getItem(k);if(ls){let p=JSON.parse(ls||'{}');if(p&&(p.resposta||p.alternativa||p.obs))return p;}if(typeof DATA!=='undefined'&&DATA&&Array.isArray(DATA.fts)){let f=DATA.fts.find(function(x){return x&&x.nome===ft;});if(f&&Array.isArray(f.processos)){let p=f.processos.find(function(x){return x&&x.nome===proc;});if(p&&Array.isArray(p.decision_items)){let di=p.decision_items.find(function(x){return x&&(x.item===dim||x.dimensao===dim||x['Item analisado']===dim);});if(di&&(di.resposta||di.alternativa||di.obs))return {resposta:di.resposta||'',alternativa:di.alternativa||'',obs:di.obs||'',updatedAt:di.updatedAt||'',status:di.status||''};}}}return JSON.parse(ls||'{}');}catch(e){return {}}}
+function getSavedDecision(ft,proc,dim){let k=dcKey(ft,proc,dim);try{if(PMI_DECISION_BACKUP&&PMI_DECISION_BACKUP[k])return PMI_DECISION_BACKUP[k];return JSON.parse(localStorage.getItem(k)||'{}')}catch(e){return {}}}
 function setSavedDecision(ft,proc,dim,data){let cur=getSavedDecision(ft,proc,dim);let next={...cur,...data,updatedAt:new Date().toISOString()};localStorage.setItem(dcKey(ft,proc,dim),JSON.stringify(next));return next;}
 function fmtDecisionText(t,isPpt,color){return summaryHtml(t,color||'var(--a2)',!!isPpt);}
 function dcSizeClass(t){let n=String(t||'').length;return n>900?'content-xl':(n>420?'content-tall':'content-normal');}
@@ -362,8 +463,8 @@ function renderDecisionTable(){
   let wrap=document.getElementById('dc-list');
   if(wrap){wrap.innerHTML=html;}
   let root=wrap||document.getElementById('pg-decisoes');
-  root.querySelectorAll('.dcr-btn').forEach(btn=>btn.addEventListener('click',function(){let rk=this.dataset.rk,r=this.dataset.r;let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;let novaResposta=(_dcLinhas[idx].resposta===r)?'':r;_dcLinhas[idx].resposta=novaResposta;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:novaResposta,alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});renderDecisionTable();}));
-  root.addEventListener('blur',function(ev){let ta=ev.target;if(!ta.id)return;if(ta.id.startsWith('alt_')||ta.id.startsWith('obs_')){let rk=ta.id.replace(/^alt_|^obs_/,'');let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;if(ta.id.startsWith('alt_'))_dcLinhas[idx].alternativa=ta.value;else _dcLinhas[idx].obs=ta.value;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:_dcLinhas[idx].resposta||'',alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});}},true);
+  root.querySelectorAll('.dcr-btn').forEach(btn=>btn.addEventListener('click',function(){if(!pprCanEdit()||this.disabled) return;let rk=this.dataset.rk,r=this.dataset.r;let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;let novaResposta=(_dcLinhas[idx].resposta===r)?'':r;_dcLinhas[idx].resposta=novaResposta;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:novaResposta,alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});renderDecisionTable();}));
+  root.addEventListener('blur',function(ev){if(!pprCanEdit()) return;let ta=ev.target;if(!ta.id)return;if(ta.id.startsWith('alt_')||ta.id.startsWith('obs_')){let rk=ta.id.replace(/^alt_|^obs_/,'');let idx=_dcLinhas.findIndex(x=>String(x.ft+'__'+x.proc+'__'+x.dim).replace(/[^a-z0-9]/gi,'_')===rk);if(idx<0)return;if(ta.id.startsWith('alt_'))_dcLinhas[idx].alternativa=ta.value;else _dcLinhas[idx].obs=ta.value;setSavedDecision(_dcLinhas[idx].ft,_dcLinhas[idx].proc,_dcLinhas[idx].dim,{resposta:_dcLinhas[idx].resposta||'',alternativa:_dcLinhas[idx].alternativa||'',obs:_dcLinhas[idx].obs||''});}},true);
 }
 function renderRaci(){let f=currentFT;document.getElementById('pg-raci').innerHTML=`<div class="ins"><strong>RACI To-be</strong> — use esta matriz para registrar papéis e responsabilidades da NewCo por processo e etapa. As colunas representam as Forças-Tarefa e o preenchimento deve refletir decisões validadas em workshop, evitando assumir responsabilidades ainda não acordadas.</div>${processFilterHtml('raci-proc-filter',f)}<div class="raci-table-wrap"><table id="raci-tbl" class="raci-table"></table></div>`;let render=()=>{let v=document.getElementById('raci-proc-filter').value;let ps=orderedStatusQCProcesses(f).filter(p=>v==='Todos'||p.nome===v);let opts=['','R','A','C','I','R/A','R/C','R/I','A/C','A/I','C/I','R/A/C','R/A/I','R/C/I','A/C/I','R/A/C/I'];document.getElementById('raci-tbl').innerHTML=`<thead><tr><th>Processo / etapa</th><th>Etapa</th><th>Subetapa / observação</th><th>Decisão?</th>${FTS_RACI.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${ps.flatMap(p=>{let etapas=p.etapas&&p.etapas.length?p.etapas:['Etapa a detalhar'];let group=`<tr class="raci-group-row"><td colspan="${4+FTS_RACI.length}">${esc(p.nome)} <span class="sticky-note">· ${etapas.length} etapas · ${(p.questoes||[]).length||0} questões</span></td></tr>`;let rows=etapas.map((e,idx)=>`<tr><td><b>${idx===0?esc(p.nome):''}</b></td><td>${esc(e)}</td><td><input class="raci-input" placeholder="Adicionar subetapa, se necessário"></td><td><select class="raci-decision"><option>Não</option><option>Sim</option></select></td>${FTS_RACI.map(()=>`<td><select class="raci-select">${opts.map(o=>`<option>${o||'—'}</option>`).join('')}</select></td>`).join('')}</tr>`);return [group,...rows]}).join('')}</tbody>`};document.getElementById('raci-proc-filter').onchange=render;render();}
 function downloadRows(rows,filename){let csv=rows.map(r=>r.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=filename;a.click();}
@@ -849,7 +950,20 @@ document.getElementById('btn-hub').onclick=showHub;
     {item:'Áreas envolvidas na execução',ocp:'Operação, Manutenção e Logística; Finanças não envolvida no processo.',cbo:'Operação, Manutenção, Logística e Serviços Técnicos; Finanças envolvida na validação orçamentária.',sugestao:'Operação, Manutenção, Logística e Finanças; Serviços Técnicos envolvidos na definição/revisão da lista.',origem:'Mix'}]);
   (DATA.fts||[]).forEach(f=>(f.processos||[]).forEach(p=>{p.score_max=pScore(p);if(procHasPptResumo(p))return;var m={};(p.linhas||[]).forEach(l=>{var d=normDimName(l['Dimensão analisada']||l['Dimensão']||'');if(!d)return;m[d]=mergeDimObj(m[d],{ocp:l['OceanPact']||'',cbo:l['CBO']||'',sugestao:l['Sugestão da FT']||l['Sugestão']||'',origem:l['Origem']||''});});if(Object.keys(m).length)p.dimensoes=Object.assign({},p.dimensoes||{},m);}));
   window.renderResumo=function(){var f=currentFT;if(!f){return renderHub();}var base=statusBase(f),prio=base.filter(prioridadeProcesso),geral=calcProgressProcessList(base),prioProg=calcProgressProcessList(prio),done=base.filter(p=>isDoneStatus(p.status)).length,donePrio=prio.filter(p=>isDoneStatus(p.status)).length,contrast=(f.processos||[]).filter(p=>Object.keys(p.dimensoes||{}).length||procHasPptResumo(p)||(p.linhas||[]).length).length;var rows=orderedProcesses(f).slice(0,8).map(p=>`<tr><td><b>${esc(p.nome)}</b><div class="status-note">${prioridadeProcesso(p)?'Prioritário':'Backlog'} · ${isDoneStatus(p.status)?'finalizado/validado':'em andamento ou não iniciado'} ${procHasPptResumo(p)?'· resumo PPT preservado':''}</div></td><td>${badgeStatus(p.status)}</td><td>${priorityBadge(p)}</td><td>${scorePill(pScore(p))}</td><td>${(p.questoes||[]).length||p.total_questoes||0}</td></tr>`).join('');document.getElementById('pg-resumo').innerHTML=`<div class="execdash"><div class="exec-hero"><div><div class="exec-eyebrow">FT ${esc(f.nome)} · Resumo Executivo</div><div class="exec-title">Painel da Força-Tarefa selecionada</div><div class="exec-copy">Visão filtrada da FT ${esc(f.nome)}. Os indicadores, tabela e prioridades consideram apenas esta força-tarefa. A visão consolidada fica exclusivamente no Hub.</div></div><div class="exec-bigrow"><div class="exec-big"><div class="exec-big-val">${pct(geral)}</div><div class="exec-big-lbl">Avanço geral</div></div><div class="exec-big"><div class="exec-big-val">${pct(prioProg)}</div><div class="exec-big-lbl">Avanço prioritários</div></div></div></div><div class="exec-metrics"><div class="exec-card blue"><div class="exec-card-val">${base.length}</div><div class="exec-card-lbl">Processos da FT</div><div class="exec-card-sub">Sem misturar com outras FTs</div></div><div class="exec-card orange"><div class="exec-card-val">${f.total_questoes}</div><div class="exec-card-lbl">Questões-chave</div><div class="exec-card-sub">Base da FT selecionada</div></div><div class="exec-card green"><div class="exec-card-val">${done}</div><div class="exec-card-lbl">Finalizados / validados</div><div class="exec-card-sub">Status final</div></div><div class="exec-card red"><div class="exec-card-val">${donePrio}/${prio.length}</div><div class="exec-card-lbl">Prioritários finalizados</div><div class="exec-card-sub">Primeiros nas visões</div></div><div class="exec-card"><div class="exec-card-val">${contrast}</div><div class="exec-card-lbl">Com contraste</div><div class="exec-card-sub">Processos com práticas mapeadas</div></div></div></div><div class="progwrap"><div class="progtitle">Avanço da FT ${esc(f.nome)}</div><div class="progbg"><div class="progfill" style="width:${geral}%"></div></div><div class="progtitle" style="margin-top:14px">Avanço dos processos prioritários</div><div class="progbg"><div class="progfill" style="width:${prioProg}%"></div></div></div><div class="twrap"><table class="tbl"><thead><tr><th>Processo priorizado</th><th>Status</th><th>Prioridade</th><th>Score</th><th>Questões</th></tr></thead><tbody>${rows}</tbody></table></div>`;};
-  window.openFT=function(name){currentFT=(DATA.fts||[]).find(f=>f.nome===name);if(!currentFT)return;_dcFiltro='Todos';setHeader(currentFT);document.getElementById('tabbar').style.display='flex';document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelector('.tab[data-t="resumo"]').classList.add('active');renderFT();showPage('resumo');window.scrollTo(0,0);};
+  window.openFT=function(name){
+  if(!canViewFT(name)){
+    // Acesso negado
+    currentFT=(DATA.fts||[]).find(f=>f.nome===name)||{nome:name};
+    setHeader(currentFT);
+    document.getElementById('tabbar').style.display='flex';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelector('.tab[data-t="resumo"]').classList.add('active');
+    renderAccessDenied('Você não tem permissão para visualizar a FT '+name+'. Procure o administrador para cadastrar suas permissões.');
+    showPage('resumo');
+    window.scrollTo(0,0);
+    return;
+  }
+  currentFT=(DATA.fts||[]).find(f=>f.nome===name);if(!currentFT)return;_dcFiltro='Todos';setHeader(currentFT);document.getElementById('tabbar').style.display='flex';document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelector('.tab[data-t="resumo"]').classList.add('active');renderFT();showPage('resumo');window.scrollTo(0,0);};
 })();
 </script>
 
@@ -1052,18 +1166,96 @@ async function carregarDecisoesDoBanco() {
 
 
   window.pmiCarregarSnapshot = carregarSnapshot;
+  window.carregarBaseAcesso = function(){ return carregarBaseAcesso(); };
+
+  // ── Carrega base de gestão de acesso via Excel no S3 ──
+  async function carregarBaseAcesso(){
+    try{
+      // Busca active.json para obter o acesso_key
+      var cfgRes = await fetch(PMI_SNAPSHOTS_API+'/snapshots/active-config', {cache:'no-store'});
+      if(!cfgRes.ok){ PMI_ACCESS_LOADED = true; return; }
+      var cfg = await cfgRes.json();
+      var acessoKey = cfg && cfg.acesso_key ? cfg.acesso_key : null;
+      if(!acessoKey){ PMI_ACCESS_LOADED = true; return; }
+
+      // Busca presigned URL do Excel
+      var dataRes = await fetch(PMI_SNAPSHOTS_API+'/snapshots/data?key='+encodeURIComponent(acessoKey), {cache:'no-store'});
+      if(!dataRes.ok){ PMI_ACCESS_LOADED = true; return; }
+      var meta = await dataRes.json();
+      if(!meta||!meta.presigned_url){ PMI_ACCESS_LOADED = true; return; }
+
+      // Baixa o Excel e parseia com SheetJS
+      var xlsRes = await fetch(meta.presigned_url);
+      if(!xlsRes.ok){ PMI_ACCESS_LOADED = true; return; }
+      var arrayBuf = await xlsRes.arrayBuffer();
+
+      // SheetJS — carregado via CDN se não estiver disponível
+      if(typeof XLSX === 'undefined'){
+        await new Promise(function(resolve, reject){
+          var s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+      }
+
+      var wb = XLSX.read(arrayBuf, {type:'array'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      // Ignora header (linha 0), processa linhas de dados
+      PMI_ACCESS_DB = [];
+      for(var i=1; i<rows.length; i++){
+        var r = rows[i];
+        if(!r[1]) continue; // email vazio: pula
+        PMI_ACCESS_DB.push({
+          nome:         String(r[0]||'').trim(),
+          email:        String(r[1]||'').trim(),
+          empresa:      String(r[2]||'').trim(),
+          perfil:       String(r[3]||'').trim(),
+          forca_tarefa: String(r[4]||'').trim()
+        });
+      }
+      PMI_ACCESS_LOADED = true;
+
+      // Re-renderiza hub para qualquer usuário não-Gradus após carregar a base de acesso
+      // (necessário porque o hub foi renderizado inicialmente com PPR_USER=null, sem filtros)
+      if(PPR_USER && !isGradusUser()){
+        var userRows = getUserRows();
+        if(!userRows.length){
+          setHub('<div class="ins" style="border-left-color:#800000;text-align:center;padding:48px 24px"><div style="font-size:40px;margin-bottom:16px">🔒</div><strong style="font-size:18px;color:#800000">Acesso não configurado</strong><br><br><span style="color:#4A5E73;font-size:14px">Procure o administrador para cadastrar suas permissões.</span></div>');
+          return;
+        }
+        // Sempre re-renderiza para aplicar filtro de FTs visíveis
+        if(typeof renderHub === 'function') renderHub();
+        if(typeof setHeader === 'function') setHeader(null);
+      }
+
+    }catch(e){
+      console.warn('Falha ao carregar base de acesso:', e);
+      PMI_ACCESS_LOADED = true;
+    }
+  }
 
   async function init(){
     setHub('<div class="ins"><strong>Carregando sistema...</strong><br>Listando versões disponíveis no S3...</div>');
-    // Carrega snapshot ativa primeiro — retorna o key dela via active.txt
+    // Carrega base de acesso em paralelo (standalone — fora do PPR não recebe ppr.init)
+    if(!PPR_USER){ carregarBaseAcesso(); }
+    // Carrega configuração ativa via active.json
     var activeKey = null;
     try{
-      var resAtiva = await fetch(PMI_SNAPSHOTS_API+'/snapshots/data', {cache:'no-store'});
+      // Primeiro obtém active.json para saber snapshot_key e acesso_key
+      var cfgRes = await fetch(PMI_SNAPSHOTS_API+'/snapshots/active-config', {cache:'no-store'});
+      var activeConfig = cfgRes.ok ? await cfgRes.json() : {};
+      var snapshotKey = activeConfig.snapshot_key || null;
+
+      var resAtiva = await fetch(snapshotKey
+        ? PMI_SNAPSHOTS_API+'/snapshots/data?key='+encodeURIComponent(snapshotKey)
+        : PMI_SNAPSHOTS_API+'/snapshots/data', {cache:'no-store'});
       if(resAtiva.ok){
         var metaAtiva = await resAtiva.json();
         if(metaAtiva && metaAtiva.presigned_url){
-          // Já temos a ativa — carrega o dado
-          activeKey = metaAtiva.key || null;
+          activeKey = metaAtiva.key || snapshotKey || null;
           var dataRes = await fetch(metaAtiva.presigned_url);
           if(!dataRes.ok) throw new Error('HTTP '+dataRes.status+' ao baixar snapshot');
           var json = await dataRes.json();
@@ -1206,7 +1398,7 @@ async function carregarDecisoesDoBanco() {
     document.getElementById('pg-resumo').innerHTML = resumoCardsFT(f) + panelFT(f,false) + resumoTableFT(f);
   };
   window.renderHub=function(){
-    var panels=(DATA.fts||[]).map(function(f){return panelFT(f,true)}).join('');
+    var panels=(DATA.fts||[]).filter(function(f){return canViewFT(f.nome);}).map(function(f){return panelFT(f,true)}).join('');
     document.getElementById('pg-hub').innerHTML = hubCards() + '<div class="hub-panels">'+panels+'</div>' + hubResumoTable();
     document.querySelectorAll('.acp-panel').forEach(function(p,i){p.style.cursor='pointer';p.addEventListener('click',function(){var f=(DATA.fts||[])[i]; if(f) openFT(f.nome);});});
   };
@@ -1264,7 +1456,12 @@ async function carregarDecisoesDoBanco() {
   function ftCard(f){return '<div class="ftcard" data-ft="'+esc(f.nome)+'"><div class="fttitle">FT '+esc(f.nome)+'</div><div class="ftmeta"><b>'+pct1(ftProcProgress(f))+'</b> de avanço geral · <b>'+pct1(ftProcPrioProgress(f))+'</b> prioritários<br>'+procBase(f).length+' processos · '+(f.total_questoes||qList(f).length)+' questões · '+finalizadosPrio(f)+' prioritários finalizados<br>'+((f.processos_com_contraste!=null?f.processos_com_contraste:procAll(f).filter(function(p){return Object.keys(p.dimensoes||{}).length||(p.linhas||[]).length||(typeof procHasPptResumo==='function'&&procHasPptResumo(p));}).length))+' processos com contraste</div><div class="progbg" style="margin-top:12px"><div class="progfill" style="width:'+ftProcProgress(f)+'%"></div></div></div>';}
 
   window.renderHub=function(){
-    var fts=DATA.fts||[];
+    // Filtra FTs visíveis para o usuário atual
+    var fts=(DATA.fts||[]).filter(function(f){ return canViewFT(f.nome); });
+    if(PPR_USER && !isGradusUser() && PMI_ACCESS_LOADED && !getUserRows().length){
+      document.getElementById('pg-hub').innerHTML='<div class="ins" style="border-left-color:#800000;text-align:center;padding:48px 24px"><div style="font-size:40px;margin-bottom:16px">🔒</div><strong style="font-size:18px;color:#800000">Acesso não configurado</strong><br><br><span style="color:#4A5E73;font-size:14px">Procure o administrador para cadastrar suas permissões.</span></div>';
+      return;
+    }
     var allProc=fts.flatMap(procBase), allPrio=allProc.filter(isPrio);
     var procProg=metaPct(['progresso_geral','progresso'],avg(fts.map(ftProcProgress)));
     var procPrioProg=metaPct(['progresso_geral_priorizado_ponderado','progresso_geral_priorizado','progresso_priorizados','progresso_prioritarios'],avg(fts.map(ftProcPrioProgress).filter(function(v){return v||v===0;})));
@@ -2579,140 +2776,6 @@ async function carregarDecisoesDoBanco() {
   };
   var btn = document.getElementById('btn-csv');
   if(btn) btn.onclick = function(){ exportDecisionsCSV(); };
-})();
-</script>
-
-<script id="v52_contraste_painel_sincronia_sem_truncamento">
-/*
- * v52 — Garante que:
- *   1) Contraste de Práticas e Painel de Decisões consomem EXATAMENTE a mesma matriz.
- *   2) Nenhum texto é truncado (resumo ou drill-down de etapas).
- *
- * Cascata canônica de fonte:
- *   ppt_rows[] (oficial)  →  ppt_rows[] (fallback contrast_mirror)
- *   →  p.dimensoes (mesclado com linhas de etapas)
- *   →  linhas[] consolidadas de p.linhas[]
- *
- * Sempre retorna o mesmo shape:
- *   [{item, ocp, cbo, sugestao, origem}, ...]  na ordem DIM_ORD.
- */
-(function(){
-  if(window.__PMI_V52_SINCRONIA__) return;
-  window.__PMI_V52_SINCRONIA__ = true;
-
-  function S(v){ return String(v == null ? '' : v).trim(); }
-  function pickStr(o, keys){
-    o = o || {};
-    for(var i=0;i<keys.length;i++){ var v=o[keys[i]]; if(v != null && S(v) !== '') return v; }
-    return '';
-  }
-  function mergeDim(a, b){
-    try { return mergeDimObj(a,b); } catch(e){}
-    a=a||{}; b=b||{};
-    function mt(x,y){ x=S(x); y=S(y); if(!x) return y; if(!y || x===y) return x; return x+'\n'+y; }
-    return { ocp:mt(a.ocp,b.ocp), cbo:mt(a.cbo,b.cbo), sugestao:mt(a.sugestao,b.sugestao), origem:a.origem||b.origem||'' };
-  }
-  function normDim(d){
-    try { return normDimName(d || ''); } catch(e){ return d || 'Atividades'; }
-  }
-  function dimOrder(){
-    return (typeof DIM_ORD !== 'undefined' && DIM_ORD && DIM_ORD.length)
-      ? DIM_ORD
-      : ['Atividades','Critérios de decisão e políticas','Sistemas','Indicadores de desempenho / métricas','Áreas envolvidas na execução'];
-  }
-
-  // Fonte 1: ppt_rows[] (oficial ou fallback) — preserva ordem do array.
-  function fromPptRows(p){
-    var src = (p && Array.isArray(p.ppt_rows)) ? p.ppt_rows : [];
-    if(!src.length) return null;
-    var map = {};
-    src.forEach(function(r){
-      var raw = pickStr(r, ['item','parte','Item analisado']) || 'Atividades';
-      var dim = normDim(raw);
-      map[dim] = mergeDim(map[dim], {
-        ocp:      pickStr(r, ['ocp','oceanpact','OceanPact']),
-        cbo:      pickStr(r, ['cbo','CBO']),
-        sugestao: pickStr(r, ['sugestao','newco','NewCo','NewCo / Sugestão']),
-        origem:   pickStr(r, ['origem','Origem']) || 'Mix'
-      });
-    });
-    return map;
-  }
-
-  // Fonte 2: p.dimensoes mesclado com linhasPorEtapa (cobre dimensões que só aparecem nas etapas).
-  function fromDimensoes(p){
-    var map = {};
-    try { map = normalizeDimMap((p && p.dimensoes) || {}); } catch(e){ map = (p && p.dimensoes) || {}; }
-    try {
-      var etapas = (typeof linhasPorEtapa === 'function') ? linhasPorEtapa(p) : {};
-      Object.keys(etapas || {}).forEach(function(et){
-        var dmap = etapas[et] || {};
-        Object.keys(dmap).forEach(function(d){
-          var nd = normDim(d);
-          map[nd] = mergeDim(map[nd], dmap[d]);
-        });
-      });
-    } catch(e){}
-    return Object.keys(map).length ? map : null;
-  }
-
-  // FONTE CANÔNICA: usada por Contraste e por Painel de Decisões.
-  function getResumoMatrix(p){
-    if(!p) return [];
-    var map = fromPptRows(p) || fromDimensoes(p) || {};
-    return dimOrder().map(function(d){
-      var v = map[d] || {};
-      return {
-        item: d,
-        ocp: S(v.ocp),
-        cbo: S(v.cbo),
-        sugestao: S(v.sugestao || v.newco),
-        origem: S(v.origem) || 'Mix'
-      };
-    });
-  }
-  window.getResumoMatrix = getResumoMatrix;
-
-  // Sobrescreve pptRowsNormalized para sempre devolver a matriz canônica.
-  // (Era usada por pptResumoRowsHtml — agora também passa a usar a fonte unificada.)
-  window.pptRowsNormalized = function(p){ return getResumoMatrix(p); };
-
-  // Painel de Decisões V50: substitui V50_summaryRowsForDecision para usar a mesma fonte.
-  window.V50_summaryRowsForDecision = function(p){ return getResumoMatrix(p); };
-
-  // Garante que getPptSummaryRowsForRender enxergue qualquer processo com matriz como tendo "rows".
-  // Sem isso, renderContraste cairia no path antigo (de dims) quando ppt_rows estivesse vazio,
-  // e usaria summaryHtml(..., false) — que já neutralizamos, mas duplica o trabalho.
-  var _origGetPptSummary = window.getPptSummaryRowsForRender;
-  window.getPptSummaryRowsForRender = function(p){
-    try {
-      var rows = getResumoMatrix(p);
-      // Se existe alguma célula com conteúdo, considera "tem matriz para mostrar"
-      var hasContent = rows.some(function(r){ return r.ocp || r.cbo || r.sugestao; });
-      if(hasContent){
-        // Mantém o título legado quando há PPT oficial; senão usa o título neutro
-        var hasOfficial = (p && Array.isArray(p.ppt_rows) && p.ppt_rows.some(function(r){
-          return r && (r.is_official_ppt_summary===true || r.source_type==='ppt_official' || r.fonte==='ppt_oficial');
-        }));
-        return {
-          rows: rows,
-          title: hasOfficial ? 'Resumo Oficial do PPT' : 'Resumo do contraste consolidado',
-          kind: hasOfficial ? 'ppt_official' : 'contrast_unified'
-        };
-      }
-    } catch(e){ console.warn('v52 getPptSummaryRowsForRender fallback:', e); }
-    return _origGetPptSummary ? _origGetPptSummary.apply(this, arguments) : {rows:[], title:'', kind:'empty'};
-  };
-
-  // Força re-render se as abas já estiverem ativas
-  try {
-    if(typeof renderContraste === 'function' &&
-       document.getElementById('pg-contraste') &&
-       document.getElementById('pg-contraste').classList.contains('active')) renderContraste();
-    if(typeof renderDecisoes === 'function' &&
-       document.getElementById('pg-decisoes') &&
-       document.getElementById('pg-decisoes').classList.contains('active')) renderDecisoes();
-  } catch(e){}
 })();
 </script>
 </body></html>
