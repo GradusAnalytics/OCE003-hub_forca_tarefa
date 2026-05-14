@@ -53,6 +53,23 @@
 .prio-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.45px;border-radius:12px;padding:3px 8px;background:rgba(128,0,0,.08);color:#800000;border:1px solid rgba(128,0,0,.28);white-space:nowrap}.prio-badge.low{background:rgba(123,142,160,.08);color:var(--tx3);border-color:rgba(123,142,160,.25)}
 .progress-mini{display:flex;align-items:center;gap:8px;min-width:160px}.progress-mini .progbg{height:8px;flex:1;margin:0}.progress-mini span{font-size:11px;font-weight:900;color:var(--dk1);min-width:42px;text-align:right}.status-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}.qc-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:12px 18px;border-bottom:1px solid var(--bdr);background:#FAFBFD}.qc-mini{border:1px solid var(--bdr);background:#fff;border-radius:4px;padding:10px}.qc-mini-val{font-size:20px;font-weight:900;color:var(--dk1);line-height:1}.qc-mini-lbl{font-size:10px;font-weight:900;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}.qc-table-wrap{padding:0 18px 18px}.status-note{font-size:11px;color:var(--tx3);font-weight:800}.status-row-prio td:first-child{border-left:4px solid #800000}.status-row-done td{background:rgba(0,176,80,.035)!important}.ppt-source-note{font-size:10px;font-weight:900;letter-spacing:.45px;text-transform:uppercase;color:#007833;background:rgba(0,176,80,.08);border:1px solid rgba(0,176,80,.25);border-radius:12px;padding:3px 8px;white-space:nowrap}
 .bullet-line{line-height:1.45;margin:1px 0}.ppt-td-ocp .bullet-line,.ppt-td-cbo .bullet-line,.ppt-td-nc .bullet-line,.dc-owner-cell .bullet-line{text-align:left}</style>
+<style id="decisions_log_css">
+/* ── Tooltip de histórico de decisões ── */
+#dc-log-tooltip{position:fixed;z-index:9999;background:#12376C;color:#fff;border-radius:6px;padding:12px 16px;font-size:12px;max-width:420px;min-width:240px;box-shadow:0 8px 32px rgba(0,32,96,.45);pointer-events:none;display:none;line-height:1.5;font-family:Nunito,Arial,sans-serif}
+.dc-hist-hdr{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.45);margin-bottom:8px}
+.dc-hist-entry{border-top:1px solid rgba(255,255,255,.12);padding-top:7px;margin-top:7px}
+.dc-hist-entry:first-child{border-top:none;padding-top:0;margin-top:0}
+.dc-hist-entry.is-current{border-left:3px solid #E68E18;padding-left:8px;margin-left:-8px}
+.dc-hist-user{font-weight:800;color:rgba(255,255,255,.9)}
+.dc-hist-time{font-size:10px;color:rgba(255,255,255,.45);margin-left:5px}
+.dc-hist-field{color:rgba(255,255,255,.65);font-size:11px;margin-top:3px;word-break:break-word}
+/* ── Botão Aplicar Alterações ── */
+#btn-dc-apply{font-family:Nunito,Arial,sans-serif;font-size:12px;font-weight:800;padding:5px 14px;border-radius:3px;border:1px solid rgba(0,176,80,.5);background:rgba(0,176,80,.07);color:#007833;cursor:pointer;display:none;align-items:center;gap:6px;transition:all .15s}
+#btn-dc-apply.has-pending{display:inline-flex}
+#btn-dc-apply.saving{opacity:.6;cursor:not-allowed}
+#btn-dc-apply:not(.saving):hover{background:#007833;color:#fff;border-color:#007833}
+.dc-hist-icon{font-size:9px;opacity:.5;margin-left:4px;cursor:default;vertical-align:middle}
+</style>
 <style id="v42_drilldown_topic_tree_css">
 /* V42 - padroniza OCP/CBO/NewCo no drill-down Ver Etapas como tópicos semânticos aninhados, preservando demais estilos */
 #pg-contraste .ctbl td .step-tree{margin:0;padding-left:18px;white-space:normal;list-style-position:outside;}
@@ -435,7 +452,7 @@ function dcSizeClass(t){let n=String(t||'').length;return n>900?'content-xl':(n>
 function procDims(p){return DIM_ORD.slice();}
 function buildDecisionLines(f){let rows=[];orderedStatusQCProcesses(f).filter(p=>isDoneStatus(p.status)).forEach(p=>{let dec=(p.decision_items||[]);if(dec.length){dec.forEach((di,i)=>{let dim=di.item||di.dimensao||di['Item analisado']||DIM_ORD[i]||('Item '+(i+1));let saved=getSavedDecision(f.nome,p.nome,dim);rows.push({ft:f.nome,proc:p.nome,dim,origem:di.origem||di.Origem||'Mix',ocp:di.ocp||di.oceanpact||di.OceanPact||'',cbo:di.cbo||di.CBO||'',sugestao:di.newco||di.sugestao||di['NewCo / Sugestão']||'',status:saved.status||'Pendente',resposta:saved.resposta||'',alternativa:saved.alternativa||'',obs:saved.obs||'',p:p,fromPpt:false,source_type:di.source_type||'decision_from_contrast'});});}else{let dims=procDims(p);let nd=normalizeDimMap(p.dimensoes||{});dims.forEach(dim=>{let v=nd[dim]||{};let saved=getSavedDecision(f.nome,p.nome,dim);rows.push({ft:f.nome,proc:p.nome,dim,origem:v.origem||'Mix',ocp:v.ocp||'',cbo:v.cbo||'',sugestao:v.sugestao||v.newco||'',status:saved.status||'Pendente',resposta:saved.resposta||'',alternativa:saved.alternativa||'',obs:saved.obs||'',p:p,fromPpt:false,source_type:'decision_from_dimensoes'});});}});return rows;}
 function atualizarContadorDecisoes(){let cnt={concordar:0,discordar:0,pendente:0};_dcLinhas.forEach(l=>{if(l.resposta==='concordar')cnt.concordar++;else if(l.resposta==='discordar')cnt.discordar++;else cnt.pendente++;});let el=document.getElementById('dc-ctr');if(el)el.innerHTML='<div class="dcchip"><span style="color:#007833;font-weight:800">'+cnt.concordar+'</span> Aprovou</div><div class="dcchip"><span style="color:#800000;font-weight:800">'+cnt.discordar+'</span> Reprovou</div><div class="dcchip"><span style="color:var(--tx3);font-weight:800">'+cnt.pendente+'</span> Pendente</div>';}
-function renderDecisoes(){let f=currentFT;_dcLinhas=buildDecisionLines(f);_dcProcOrder={};orderedStatusQCProcesses(f).filter(p=>isDoneStatus(p.status)).forEach((p,i)=>{_dcProcOrder[p.nome]=i;});document.getElementById('pg-decisoes').innerHTML='<div class="ins"><strong>Painel de Decisões</strong> — aprove ou reprove as recomendações que já estão prontas para decisão. Em processos, aparecem apenas os itens finalizados ou validados; em questões-chave, todos os itens continuam visíveis e são priorizados por status e criticidade. Ao reprovar, registre a alternativa esperada para orientar o ajuste.</div><div class="dcctr" id="dc-ctr"></div><div class="raci-controls dc-controls"><span class="cpflbl">Processo:</span><select class="raci-filter" id="dc-proc-filter"><option value="Todos">Todos os processos</option></select><button class="cpfbtn" id="dc-sort">Ordem do contraste</button></div><div id="dc-list"></div>';let sel=document.getElementById('dc-proc-filter');let procs=orderedStatusQCProcesses(f).filter(p=>isDoneStatus(p.status)).filter(p=>_dcLinhas.some(l=>l.proc===p.nome)).map(p=>p.nome);sel.innerHTML='<option value="Todos">Todos os processos</option>'+procs.map(p=>'<option value="'+esc(p)+'">'+esc(p)+'</option>').join('');sel.value=_dcFiltro;sel.onchange=function(){_dcFiltro=this.value||'Todos';renderDecisionTable();};let sort=document.getElementById('dc-sort');sort.onclick=function(){renderDecisionTable();};renderDecisionTable();}
+function renderDecisoes(){let f=currentFT;_dcLinhas=buildDecisionLines(f);_dcProcOrder={};orderedStatusQCProcesses(f).filter(p=>isDoneStatus(p.status)).forEach((p,i)=>{_dcProcOrder[p.nome]=i;});document.getElementById('pg-decisoes').innerHTML='<div class="ins"><strong>Painel de Decisões</strong> — aprove ou reprove as recomendações que já estão prontas para decisão. Em processos, aparecem apenas os itens finalizados ou validados; em questões-chave, todos os itens continuam visíveis e são priorizados por status e criticidade. Ao reprovar, registre a alternativa esperada para orientar o ajuste.</div><div class="dcctr" id="dc-ctr"></div><div class="raci-controls dc-controls"><span class="cpflbl">Processo:</span><select class="raci-filter" id="dc-proc-filter"><option value="Todos">Todos os processos</option></select><button class="cpfbtn" id="dc-sort">Ordem do contraste</button><button id="btn-dc-apply" onclick="aplicarAlteracoes()" title="Salva todas as decisões pendentes no log centralizado do S3">💾 Aplicar Alterações</button></div><div id="dc-log-tooltip"></div><div id="dc-list"></div>';let sel=document.getElementById('dc-proc-filter');let procs=orderedStatusQCProcesses(f).filter(p=>isDoneStatus(p.status)).filter(p=>_dcLinhas.some(l=>l.proc===p.nome)).map(p=>p.nome);sel.innerHTML='<option value="Todos">Todos os processos</option>'+procs.map(p=>'<option value="'+esc(p)+'">'+esc(p)+'</option>').join('');sel.value=_dcFiltro;sel.onchange=function(){_dcFiltro=this.value||'Todos';renderDecisionTable();};let sort=document.getElementById('dc-sort');sort.onclick=function(){renderDecisionTable();};renderDecisionTable();_updateApplyBtn();var _pgDec=document.getElementById('pg-decisoes');if(_pgDec&&!_pgDec._dcTipBound){_pgDec._dcTipBound=true;_pgDec.addEventListener('mouseover',function(ev){var tr=ev.target.closest&&ev.target.closest('tr[data-chave]');if(tr){_dcShowTooltip(tr.getAttribute('data-chave'),ev);}else{_dcHideTooltip();}});_pgDec.addEventListener('mousemove',function(ev){_dcMoveTooltip(ev);});_pgDec.addEventListener('mouseout',function(ev){if(!ev.relatedTarget||!_pgDec.contains(ev.relatedTarget))_dcHideTooltip();}); }}
 function renderDecisionTable(){
   atualizarContadorDecisoes();
   let linhas=_dcLinhas.filter(l=>_dcFiltro==='Todos'||l.proc===_dcFiltro).slice();
@@ -449,8 +466,9 @@ function renderDecisionTable(){
     let rows=g.rows.map(l=>{
       let rk=String(l.ft+'__'+l.proc+'__'+l.dim).replace(/[^a-z0-9]/gi,'_');
       let origemCls=l.origem==='OCP'?'oOCP':(l.origem==='CBO'?'oCBO':'oMix');
-      return '<tr>'+
-        '<td class="ppt-td-item"><b>'+esc(DIM_SH[l.dim]||l.dim)+'</b></td>'+
+      let _chave=buildChave(l.ft,l.proc,l.dim);let _hasHist=(_decisionsLogByChave[_chave]||[]).length>0||!!_pendingDecisions[_chave];
+      return '<tr data-chave="'+esc(_chave)+'">'+
+        '<td class="ppt-td-item"><b>'+esc(DIM_SH[l.dim]||l.dim)+'</b>'+(_hasHist?'<span class="dc-hist-icon" title="Histórico disponível — passe o mouse para ver">🕑</span>':'')+'</td>'+
         '<td class="ppt-td-ocp '+dcSizeClass(l.ocp)+'">'+fmtDecisionText(l.ocp||'',l.fromPpt,'var(--lt2)')+'</td>'+
         '<td class="ppt-td-cbo '+dcSizeClass(l.cbo)+'">'+fmtDecisionText(l.cbo||'',l.fromPpt,'var(--a1)')+'</td>'+
         '<td class="ppt-td-nc dc-sug '+dcSizeClass(l.sugestao)+'">'+fmtDecisionText(l.sugestao||'',l.fromPpt,'#007833')+'</td>'+
@@ -972,92 +990,196 @@ document.getElementById('btn-hub').onclick=showHub;
 window.PMI_DECISIONS_DB = window.PMI_DECISIONS_DB || {};
 window.PMI_API_STATUS = { data: false, decisions: false, last_error: null };
 
+// ─── Estado do log de decisões (S3: decisions_log.json) ──────────────────────
+var _decisionsLog = { meta: {}, log: [] };
+var _decisionsLogByChave = {}; // { "FT||Processo||Item" : [entry, ...] } desc por timestamp
+var _pendingDecisions = {};    // { chave: { ft, proc, dim, chave, resposta, alternativa, obs, updatedAt } }
+
 function pmiApiSetStatus(label, ok, msg) {
   window.PMI_API_STATUS[label] = ok;
   window.PMI_API_STATUS.last_error = ok ? window.PMI_API_STATUS.last_error : msg;
-  const h = document.getElementById("h-progress");
+  var h = document.getElementById("h-progress");
   if (h) {
-    const dataOk = window.PMI_API_STATUS.data ? "Dados OK" : "Dados...";
-    const decOk = window.PMI_API_STATUS.decisions ? "Decisões OK" : "Decisões...";
+    var dataOk = window.PMI_API_STATUS.data ? "Dados OK" : "Dados...";
+    var decOk  = window.PMI_API_STATUS.decisions ? "Decisões OK" : "Decisões...";
     h.textContent = dataOk + " · " + decOk;
   }
 }
 
+// Constrói a chave canônica usada no log: "FT||Processo||Item"
+function buildChave(ft, proc, dim) {
+  return String(ft || '') + '||' + String(proc || '') + '||' + String(dim || '');
+}
+
+// Atualiza visibilidade/texto do botão Aplicar Alterações
+function _updateApplyBtn() {
+  var btn = document.getElementById('btn-dc-apply');
+  if (!btn) return;
+  var count = Object.keys(_pendingDecisions).length;
+  if (count > 0) {
+    btn.className = 'has-pending';
+    btn.textContent = '💾 Aplicar Alterações (' + count + ')';
+  } else {
+    btn.className = '';
+    btn.textContent = '💾 Aplicar Alterações';
+  }
+}
+
+// Lê a decisão mais recente para (ft, proc, dim):
+//   1º pendências locais → 2º log S3 → 3º PMI_DECISION_BACKUP / localStorage
 function getSavedDecision(ft, proc, dim) {
-  const k = dcKey(ft, proc, dim);
+  var chave = buildChave(ft, proc, dim);
+  if (_pendingDecisions[chave]) return _pendingDecisions[chave];
+  var logEs = _decisionsLogByChave[chave];
+  if (logEs && logEs.length) {
+    var l = logEs[0];
+    return { resposta: l.resposta || '', alternativa: l.alternativa || '', obs: l.obs || '' };
+  }
+  var k = dcKey(ft, proc, dim);
   try {
     if (window.PMI_DECISIONS_DB && window.PMI_DECISIONS_DB[k]) return window.PMI_DECISIONS_DB[k];
-    if (PMI_DECISION_BACKUP && PMI_DECISION_BACKUP[k]) return PMI_DECISION_BACKUP[k];
-    return JSON.parse(localStorage.getItem(k) || "{}");
-  } catch (e) {
-    return {};
-  }
+    if (typeof PMI_DECISION_BACKUP !== 'undefined' && PMI_DECISION_BACKUP && PMI_DECISION_BACKUP[k]) return PMI_DECISION_BACKUP[k];
+    return JSON.parse(localStorage.getItem(k) || '{}');
+  } catch (e) { return {}; }
 }
 
-async function persistDecisionToApi(key, payload) {
-  try {
-    const resp = await fetch("/api/decision", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ decision_key: key, ...payload })
-    });
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    pmiApiSetStatus("decisions", true, null);
-    return await resp.json();
-  } catch (e) {
-    console.warn("Falha ao salvar decisão no banco. Mantida no localStorage.", e);
-    pmiApiSetStatus("decisions", false, String(e.message || e));
-    return null;
-  }
-}
-
+// Registra alteração como pendente (aguarda "Aplicar Alterações" para ir ao S3)
 function setSavedDecision(ft, proc, dim, data) {
-  const k = dcKey(ft, proc, dim);
-  const cur = getSavedDecision(ft, proc, dim);
-  const next = {
-    ...cur,
-    ...data,
-    ft,
-    processo: proc,
-    item: dim,
-    updatedAt: new Date().toISOString(),
-    fonte: "PostgreSQL/API"
-  };
-
-  window.PMI_DECISIONS_DB[k] = next;
-
-  try {
-    localStorage.setItem(k, JSON.stringify(next));
-  } catch (e) {}
-
-  persistDecisionToApi(k, {
-    ft,
-    processo: proc,
-    item: dim,
-    resposta: next.resposta || "",
-    alternativa: next.alternativa || "",
-    obs: next.obs || "",
-    payload: next
-  });
-
+  var chave = buildChave(ft, proc, dim);
+  var cur  = getSavedDecision(ft, proc, dim);
+  var next = Object.assign({}, cur, data, { ft: ft, processo: proc, item: dim, updatedAt: new Date().toISOString() });
+  _pendingDecisions[chave] = Object.assign({ ft: ft, proc: proc, dim: dim, chave: chave }, next);
+  window.PMI_DECISIONS_DB[dcKey(ft, proc, dim)] = next;
+  try { localStorage.setItem(dcKey(ft, proc, dim), JSON.stringify(next)); } catch (e) {}
+  _updateApplyBtn();
   return next;
 }
 
+// Carrega decisions_log.json do S3 via Lambda GET /decisions/log
 async function carregarDecisoesDoBanco() {
   try {
-    const resp = await fetch("/api/decisions", {cache: "no-store"});
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
-    const json = await resp.json();
-    window.PMI_DECISIONS_DB = json.decisions || {};
-    console.log("Decisões carregadas do PostgreSQL:", window.PMI_DECISIONS_DB);
+    var resp = await fetch(PMI_SNAPSHOTS_API + '/decisions/log', { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var json = await resp.json();
+    _decisionsLog = json;
+    _decisionsLogByChave = {};
+    (json.log || []).forEach(function(entry) {
+      var k = entry.chave;
+      if (!_decisionsLogByChave[k]) _decisionsLogByChave[k] = [];
+      _decisionsLogByChave[k].push(entry);
+    });
+    Object.keys(_decisionsLogByChave).forEach(function(k) {
+      _decisionsLogByChave[k].sort(function(a, b) {
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+    });
+    // Sincroniza PMI_DECISIONS_DB com a entrada mais recente de cada chave
+    Object.keys(_decisionsLogByChave).forEach(function(chave) {
+      var l  = _decisionsLogByChave[chave][0];
+      var dk = dcKey(l.ft, l.processo, l.item);
+      window.PMI_DECISIONS_DB[dk] = { resposta: l.resposta || '', alternativa: l.alternativa || '', obs: l.obs || '' };
+    });
     pmiApiSetStatus("decisions", true, null);
-    return window.PMI_DECISIONS_DB;
+    return _decisionsLog;
   } catch (e) {
-    console.warn("Não foi possível carregar decisões do banco. Usando backup/localStorage.", e);
-    window.PMI_DECISIONS_DB = {};
+    console.warn('Não foi possível carregar decisions_log.json:', e);
     pmiApiSetStatus("decisions", false, String(e.message || e));
-    return {};
+    return _decisionsLog;
   }
+}
+
+// Envia todas as pendências como novos registros no decisions_log.json (nunca sobrescreve existentes)
+async function aplicarAlteracoes() {
+  var pendentes = Object.values(_pendingDecisions);
+  if (!pendentes.length) { alert('Nenhuma alteração pendente para salvar.'); return; }
+  var btn = document.getElementById('btn-dc-apply');
+  if (btn) { btn.className = 'has-pending saving'; btn.textContent = 'Salvando...'; }
+  var usuario = (typeof PPR_USER !== 'undefined' && PPR_USER && PPR_USER.email) ? PPR_USER.email : 'usuario';
+  var now = new Date().toISOString();
+  var entries = pendentes.map(function(d) {
+    return { chave: d.chave, ft: d.ft, processo: d.proc, item: d.dim, usuario: usuario,
+             resposta: d.resposta || '', alternativa: d.alternativa || '', obs: d.obs || '', timestamp: now };
+  });
+  try {
+    var resp = await fetch(PMI_SNAPSHOTS_API + '/decisions/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Token': PMI_API_TOKEN },
+      body: JSON.stringify({ entries: entries })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    // Incorpora no estado local (sem recarregar do S3)
+    entries.forEach(function(e) {
+      if (!_decisionsLogByChave[e.chave]) _decisionsLogByChave[e.chave] = [];
+      _decisionsLogByChave[e.chave].unshift(e);
+      _decisionsLog.log.push(e);
+    });
+    _decisionsLog.meta.total_entries = (_decisionsLog.log || []).length;
+    _pendingDecisions = {};
+    pmiApiSetStatus("decisions", true, null);
+    _updateApplyBtn();
+    if (typeof renderDecisionTable === 'function') renderDecisionTable();
+    if (btn) { btn.className = ''; btn.textContent = '✓ Alterações salvas!'; setTimeout(function(){ _updateApplyBtn(); }, 2500); }
+  } catch (e) {
+    if (btn) { btn.className = 'has-pending'; _updateApplyBtn(); }
+    alert('Erro ao salvar alterações: ' + String(e.message || e));
+  }
+}
+
+// ─── Tooltip de histórico ─────────────────────────────────────────────────────
+function _dcTooltipHtml(chave) {
+  var entries = (_decisionsLogByChave[chave] || []).slice();
+  var pending = _pendingDecisions[chave];
+  var all = [];
+  if (pending) {
+    all.push({ isPending: true, usuario: 'Pendente (não salvo)', resposta: pending.resposta,
+               obs: pending.obs, alternativa: pending.alternativa, timestamp: pending.updatedAt });
+  }
+  all = all.concat(entries);
+  if (!all.length) return '';
+  function fmtTs(ts) { try { return ts ? new Date(ts).toLocaleString('pt-BR') : ''; } catch(e) { return ts || ''; } }
+  function badge(r) {
+    if (r === 'concordar') return '<span style="color:#4ade80;font-weight:800">✓ Concordou</span>';
+    if (r === 'discordar') return '<span style="color:#f87171;font-weight:800">✗ Discordou</span>';
+    return '<span style="color:rgba(255,255,255,.5)">● Pendente</span>';
+  }
+  var html = '<div class="dc-hist-hdr">Histórico de decisões</div>';
+  all.forEach(function(e, i) {
+    html += '<div class="dc-hist-entry' + (i === 0 ? ' is-current' : '') + '">';
+    html += badge(e.resposta);
+    html += ' <span class="dc-hist-user">' + esc(e.usuario || '') + '</span>';
+    var ts = fmtTs(e.timestamp);
+    if (ts) html += ' <span class="dc-hist-time">' + esc(ts) + '</span>';
+    if (e.obs)         html += '<div class="dc-hist-field"><b>Obs:</b> '      + esc(String(e.obs).slice(0, 240)) + '</div>';
+    if (e.alternativa) html += '<div class="dc-hist-field"><b>Sugestão:</b> ' + esc(String(e.alternativa).slice(0, 240)) + '</div>';
+    html += '</div>';
+  });
+  return html;
+}
+
+function _dcShowTooltip(chave, e) {
+  var html = _dcTooltipHtml(chave);
+  if (!html) return;
+  var el = document.getElementById('dc-log-tooltip');
+  if (!el) return;
+  el.innerHTML = html;
+  el.style.display = 'block';
+  _dcMoveTooltip(e);
+}
+
+function _dcMoveTooltip(e) {
+  var el = document.getElementById('dc-log-tooltip');
+  if (!el || el.style.display === 'none') return;
+  var x = e.clientX + 18, y = e.clientY + 10;
+  var w = el.offsetWidth || 400, h = el.offsetHeight || 180;
+  if (x + w > window.innerWidth  - 8) x = e.clientX - w - 18;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 10;
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
+}
+
+function _dcHideTooltip() {
+  var el = document.getElementById('dc-log-tooltip');
+  if (el) el.style.display = 'none';
 }
 </script>
 
@@ -1139,6 +1261,7 @@ async function carregarDecisoesDoBanco() {
     // Se carregamos sem key explícito = carregamos a ativa, então sincroniza
     if(!key){ _activeSnapshotKey = _loadedSnapshotKey; }
     if(typeof pmiApiSetStatus==='function') pmiApiSetStatus("data", true, null);
+    if(typeof carregarDecisoesDoBanco==='function') carregarDecisoesDoBanco();
     if(typeof showHub==='function') showHub();
     // setHeader APÓS showHub/renderHub para que progresso_geral já esteja calculado
     if(typeof setHeader==='function') setHeader(null);
@@ -1264,6 +1387,7 @@ async function carregarDecisoesDoBanco() {
           _activeSnapshotKey = activeKey;
           _loadedSnapshotKey = activeKey;
           if(typeof pmiApiSetStatus==='function') pmiApiSetStatus("data", true, null);
+          if(typeof carregarDecisoesDoBanco==='function') carregarDecisoesDoBanco();
           if(typeof showHub==='function') showHub();
           if(typeof setHeader==='function') setHeader(null);
         }
