@@ -1,6 +1,7 @@
 <!DOCTYPE html>
+<!-- V57: adiciona camada de Sub-Força-Tarefa (subft_layer_v57). Quando uma FT tem processos com sub_forca_tarefa preenchida e mais de uma sub-FT distinta, ao abrir a FT mostra um painel com cards das sub-FTs + card "Visão consolidada", oculta a tabbar. Clicar em uma sub-FT entra em modo filtrado: abas internas operam sobre uma FT virtual (clone com processos/contraste_questoes/questoes filtrados por sub_forca_tarefa, KPIs recalculados). Breadcrumb com botão "← Painel FT [nome]" em todas as abas. SUB_FT_INDEX calculado em runtime a partir de DATA — recomputa ao trocar de snapshot. Renderers internos, permissões, bootstrap S3 e backup HTML intactos. -->
 <!-- V56: restaura cascata canônica getResumoMatrix (V52) e bloco v53_contraste_sync_with_decisoes (V53), perdidos na v55. Sincroniza novamente a aba Contraste de Práticas e o Painel de Decisões para mostrarem exatamente o mesmo resumo por processo (ppt_rows oficial → ppt_rows fallback → p.dimensoes ∪ linhasPorEtapa). Mantém todas as funcionalidades da v55: separação do decisions_log.json (S3) do snapshot de dados, fila de pendentes com Aplicar Alterações, permissões de FT por usuário. V50 DECISION PANEL FIX: Painel de Decisões usa a mesma matriz-resumo da aba Contraste de Práticas, preservando funcionalidades/formatações v48. V42 DRILLDOWN TOPIC TREE: padroniza tópicos OCP/CBO/NewCo no drill-down Ver Etapas com UL/LI semântico. V40 RENDER SOURCE CONTRACT: separa Resumo Oficial do PPT=ppt_rows oficiais, Contraste=dimensoes/linhas e Painel=decision_items. V35 FIX: mantém todas as dimensões analisadas no resumo e nas etapas, prioriza resumo PPT quando disponível, usa textos exatos das planilhas no drill-down, filtra mapa de decisão de processos para finalizados/validados e ordena questões por status/prioridade. V25 FIX: adiciona filtro de status para processos nas abas de contraste e decisões sem alterar formatação v24. V24 FIX: restaura drill-down Ver Etapas no contraste de processos sem alterar funcionalidades v23. Base v23: arquivo nomeado tambem como OceanPact-CBO_HTML_Hub_MultiFT.html para compatibilidade com APP.py/Render que procura nome fixo. -->
-<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Hub Multi-FT — PMI OceanPact × CBO — v56</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&display=swap" rel="stylesheet"><style>
+<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Hub Multi-FT — PMI OceanPact × CBO — v57 · sub-FT layer</title><link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800;900&display=swap" rel="stylesheet"><style>
 :root{--dk1:#002060;--dk2:#12376C;--lt2:#9DB1CF;--a1:#E68E18;--a2:#296DB7;--a3:#800000;--green:#00B050;--bg:#F4F6FA;--sur:#FFF;--sur2:#EEF2F8;--bdr:#D9DCE6;--tx:#12376C;--tx2:#4A5E73;--tx3:#7B8EA0;--shd:0 2px 8px rgba(0,32,96,.09);--r:4px}*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:14px}.hdr{height:56px;background:var(--dk1);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:300;box-shadow:0 2px 8px rgba(0,0,0,.25)}.hdr-l{display:flex;align-items:center;gap:0}.hdr-sep{width:1px;height:28px;background:rgba(157,177,207,.35);margin:0 20px}.ht{font-size:13px;color:#fff;font-weight:800;white-space:nowrap;letter-spacing:.3px}.hs{font-size:12px;color:rgba(157,177,207,.8);margin-left:8px}.hbadge{font-size:10px;font-weight:700;letter-spacing:.8px;padding:3px 10px;border-radius:3px;background:rgba(230,142,24,.18);color:#E68E18;border:1px solid rgba(230,142,24,.4)}.hdr-r{display:flex;align-items:center;gap:12px}.expbar{background:var(--sur);border-bottom:2px solid var(--a1);padding:8px 28px;display:flex;gap:10px;align-items:center;position:sticky;top:56px;z-index:299;box-shadow:0 1px 4px rgba(0,0,0,.07)}.xbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all .15s}.xbtn.pri{background:var(--dk1);color:#fff}.xbtn.sec{background:var(--sur);color:var(--a1);border:1px solid rgba(230,142,24,.5)}.exp-hint{font-size:11px;color:var(--tx3);margin-left:4px}.tabs-bar{background:var(--sur);border-bottom:2px solid var(--bdr);display:flex;padding:0 28px;position:sticky;top:104px;z-index:298;overflow-x:auto}.tab{padding:13px 20px 11px;font-size:12px;font-weight:700;color:var(--tx3);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;text-transform:uppercase;letter-spacing:.3px}.tab.active{color:var(--dk1);border-color:var(--a1)}.main{padding:28px;max-width:1600px;margin:0 auto}.page{display:none}.page.active{display:block}.ins{background:#EAF0F8;border-left:4px solid #15497F;border-radius:0 4px 4px 0;padding:10px 16px;margin-bottom:20px;font-size:13px;color:var(--dk1);line-height:1.7}.ins strong{color:var(--a1)}.kstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}.kpi{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;box-shadow:var(--shd)}.ktop{height:3px;width:100%;margin-bottom:12px;border-radius:2px}.klbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);margin-bottom:4px}.kval{font-size:26px;font-weight:800;line-height:1;color:var(--dk1)}.ksub{font-size:11px;color:var(--tx3);margin-top:3px}.progwrap{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:16px 20px;margin-bottom:24px;box-shadow:var(--shd)}.progtitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--tx3);margin-bottom:10px}.progbg{height:10px;background:var(--sur2);border-radius:6px;overflow:hidden}.progfill{height:100%;border-radius:6px;background:linear-gradient(90deg,#002060,#296DB7)}.proglbls{display:flex;gap:20px;margin-top:10px;flex-wrap:wrap}.proglbl{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2)}.pdot{width:10px;height:10px;border-radius:2px;flex-shrink:0}.twrap{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shd);overflow:hidden;margin-bottom:24px}.tbl,.qtbl,.ctbl,.dctbl,.raci-table{width:100%;border-collapse:collapse;font-size:12px}.tbl th,.qtbl th,.ctbl th,.dctbl th,.raci-table th{background:var(--sur2);color:var(--dk1);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border:1px solid var(--bdr);text-align:left}.tbl td,.qtbl td,.ctbl td,.dctbl td,.raci-table td{padding:9px 12px;border:1px solid var(--bdr);vertical-align:top;color:var(--tx2);line-height:1.45;white-space:pre-wrap}.tbl tr:nth-child(even) td,.qtbl tr:nth-child(even) td,.ctbl tr:nth-child(even) td,.dctbl tr:nth-child(even) td{background:#FAFBFD}.sb{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;white-space:nowrap}.sfin{background:rgba(0,176,80,.1);color:#007833;border:1px solid rgba(0,176,80,.3)}.sni{background:rgba(230,142,24,.1);color:#C47610;border:1px solid rgba(230,142,24,.3)}.sini{background:rgba(41,109,183,.1);color:var(--a2);border:1px solid rgba(41,109,183,.3)}.scorepill{display:inline-flex;font-size:10px;font-weight:800;padding:3px 8px;border-radius:12px;border:1px solid var(--bdr);white-space:nowrap}.scorepill.s4{background:rgba(128,0,0,.08);color:#800000;border-color:rgba(128,0,0,.35)}.scorepill.s3{background:rgba(230,142,24,.10);color:#C47610;border-color:rgba(230,142,24,.38)}.scorepill.s2{background:rgba(41,109,183,.08);color:#296DB7;border-color:rgba(41,109,183,.32)}.cpfbar,.raci-controls{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}.cpflbl{font-size:11px;font-weight:800;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px}.cpfbtn{border:1px solid var(--bdr);background:var(--sur);color:var(--tx2);border-radius:3px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}.cpfbtn.active{background:var(--dk1);color:#fff;border-color:var(--dk1)}.raci-filter{border:1px solid var(--bdr);border-radius:3px;background:#fff;color:var(--tx);font-size:12px;font-family:inherit;padding:6px 9px;min-width:320px}.execdash{display:grid;grid-template-columns:1.05fr 1.55fr;gap:16px;margin-bottom:18px}.exec-hero{background:linear-gradient(135deg,#002060,#12376C);border-radius:8px;padding:22px 24px;color:#fff;box-shadow:0 8px 24px rgba(0,32,96,.18);min-height:246px;display:flex;flex-direction:column;justify-content:space-between}.exec-eyebrow{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.68);margin-bottom:8px}.exec-title{font-size:22px;font-weight:900;line-height:1.2;margin-bottom:10px}.exec-copy{font-size:13px;line-height:1.65;color:rgba(255,255,255,.86)}.exec-bigrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.exec-big{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:12px}.exec-big-val{font-size:28px;font-weight:900;line-height:1;color:#fff}.exec-big-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.70);margin-top:5px}.exec-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.exec-card{background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:15px 16px;box-shadow:var(--shd);min-height:118px;position:relative;overflow:hidden}.exec-card:before{content:'';position:absolute;left:0;top:0;width:100%;height:4px;background:var(--dk1)}.exec-card.orange:before{background:var(--a1)}.exec-card.red:before{background:#800000}.exec-card.blue:before{background:var(--a2)}.exec-card.green:before{background:var(--green)}.exec-card-val{font-size:26px;font-weight:900;line-height:1;color:var(--dk1);margin-top:8px}.exec-card-lbl{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.65px;color:var(--tx3);margin-top:6px}.exec-card-sub{font-size:11px;color:var(--tx2);line-height:1.45;margin-top:6px}.hubgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:24px}.ftcard{background:#fff;border:1px solid var(--bdr);border-radius:8px;padding:16px;box-shadow:var(--shd);cursor:pointer}.ftcard:hover{border-color:var(--a2);transform:translateY(-1px)}.fttitle{font-size:16px;font-weight:900;color:var(--dk1);margin-bottom:6px}.ftmeta{font-size:12px;color:var(--tx2);line-height:1.5}.pcard{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shd);margin-bottom:20px;overflow:hidden}.pctop{height:4px;background:linear-gradient(90deg,#002060,#296DB7)}.pchdr{padding:10px 18px;background:var(--sur2);border-bottom:2px solid var(--a1);display:flex;align-items:flex-start;gap:12px}.pctitle{font-size:15px;font-weight:800;color:var(--dk1);flex:1;line-height:1.3}.pcdesc{font-size:11px;color:var(--tx3);margin-top:3px;line-height:1.5}.ppt-resumo{padding:0 18px 16px;border-bottom:2px solid var(--bdr)}.ppt-resumo-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--tx3);padding:12px 0 10px;display:flex;align-items:center;gap:6px}.ppt-resumo-lbl:before{content:'';display:inline-block;width:3px;height:14px;background:var(--a1);border-radius:2px}.ppt-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}.ppt-tbl th{background:var(--sur2);color:var(--dk1);font-weight:800;font-size:10px;text-transform:uppercase;padding:8px 12px;border:1px solid var(--bdr)}.ppt-tbl td{padding:10px 12px;border:1px solid var(--bdr);vertical-align:top;font-size:12px;color:var(--tx2);line-height:1.55;white-space:pre-wrap}.raci-hint{font-size:12px;color:var(--tx2);line-height:1.55;background:#fff;border:1px solid var(--bdr);border-left:4px solid var(--a1);border-radius:4px;padding:10px 14px;flex:1;min-width:280px}.raci-table-wrap{background:#fff;border:1px solid var(--bdr);border-radius:4px;box-shadow:var(--shd);overflow:auto;max-height:calc(100vh - 230px)}.raci-select,.raci-input,.raci-decision{border:1px solid var(--bdr);border-radius:3px;background:#fff;color:var(--tx);font-size:12px;font-family:inherit;padding:4px}.raci-select{width:72px}.raci-input{width:100%;min-width:160px}.raci-decision{width:80px}.pcard{overflow:visible}.pchdr{position:sticky;top:150px;z-index:60;box-shadow:0 3px 10px rgba(0,32,96,.10)}.dproc{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--shd);margin-bottom:22px;overflow:visible}.dproc-hdr{position:sticky;top:150px;z-index:61;background:var(--sur2);border-bottom:3px solid var(--a2);padding:12px 18px;box-shadow:0 3px 10px rgba(0,32,96,.10)}.dproc-title{font-size:15px;font-weight:900;color:var(--dk1);line-height:1.3}.dproc-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--tx3)}.dproc-body{padding:0}.raci-table thead th{position:sticky;top:0;z-index:30}.raci-group-row td{position:sticky;top:30px;z-index:29;background:var(--sur2)!important;border-top:3px solid var(--a2)!important;border-bottom:1px solid var(--bdr)!important;color:var(--dk1)!important;font-weight:900}.raci-table-wrap{max-height:none;overflow:visible}.sticky-note{font-size:11px;color:var(--tx3);margin-left:6px;font-weight:700;color:var(--tx3)}
 .decision-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 16px}.decision-card{border:1px solid var(--bdr);border-radius:4px;background:#fff;margin:12px 18px 16px;overflow:hidden}.decision-card.is-selected{box-shadow:0 0 0 2px rgba(230,142,24,.35)}.decision-toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#FAFBFD;border-bottom:1px solid var(--bdr);padding:10px 12px}.decision-actions{display:flex;gap:6px;flex-wrap:wrap}.decision-action{border:1px solid var(--bdr);background:#fff;color:var(--tx2);border-radius:3px;padding:5px 10px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}.decision-action.active{background:var(--dk1);color:#fff;border-color:var(--dk1)}.decision-action.warn.active{background:var(--a1);border-color:var(--a1);color:#fff}.decision-action.danger.active{background:#800000;border-color:#800000;color:#fff}.decision-meta{font-size:11px;color:var(--tx3);font-weight:700}.decision-notes{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;border-top:1px solid var(--bdr)}.decision-notes label{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);display:block;margin-bottom:5px}.decision-notes textarea{width:100%;min-height:74px;border:1px solid var(--bdr);border-radius:3px;padding:8px;font-family:inherit;font-size:12px;color:var(--tx);resize:vertical}.decision-clickhint{font-size:11px;color:var(--tx3);font-weight:700}.decision-count{font-size:11px;color:var(--tx3);font-weight:800}.dctbl tr.decision-row{cursor:pointer}.dctbl tr.decision-row:hover td{background:#FFF7EC}.dctbl tr.decision-row.active td{background:#FFF3DE!important;border-top:2px solid var(--a1);border-bottom:2px solid var(--a1)}@media(max-width:760px){.decision-notes{grid-template-columns:1fr}}.footer{background:var(--sur2);border-top:1px solid var(--bdr);padding:0 28px;height:36px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--tx3);margin-top:32px}@media(max-width:1080px){.execdash{grid-template-columns:1fr}.exec-metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.exec-metrics,.exec-bigrow{grid-template-columns:1fr}.tabs-bar{top:104px}.raci-filter{min-width:100%}}
 
@@ -52,7 +53,26 @@
 /* CORRECOES FINAIS - ordenacao, status prioritarios e restauracao abas */
 .prio-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.45px;border-radius:12px;padding:3px 8px;background:rgba(128,0,0,.08);color:#800000;border:1px solid rgba(128,0,0,.28);white-space:nowrap}.prio-badge.low{background:rgba(123,142,160,.08);color:var(--tx3);border-color:rgba(123,142,160,.25)}
 .progress-mini{display:flex;align-items:center;gap:8px;min-width:160px}.progress-mini .progbg{height:8px;flex:1;margin:0}.progress-mini span{font-size:11px;font-weight:900;color:var(--dk1);min-width:42px;text-align:right}.status-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:18px}.qc-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:12px 18px;border-bottom:1px solid var(--bdr);background:#FAFBFD}.qc-mini{border:1px solid var(--bdr);background:#fff;border-radius:4px;padding:10px}.qc-mini-val{font-size:20px;font-weight:900;color:var(--dk1);line-height:1}.qc-mini-lbl{font-size:10px;font-weight:900;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}.qc-table-wrap{padding:0 18px 18px}.status-note{font-size:11px;color:var(--tx3);font-weight:800}.status-row-prio td:first-child{border-left:4px solid #800000}.status-row-done td{background:rgba(0,176,80,.035)!important}.ppt-source-note{font-size:10px;font-weight:900;letter-spacing:.45px;text-transform:uppercase;color:#007833;background:rgba(0,176,80,.08);border:1px solid rgba(0,176,80,.25);border-radius:12px;padding:3px 8px;white-space:nowrap}
-.bullet-line{line-height:1.45;margin:1px 0}.ppt-td-ocp .bullet-line,.ppt-td-cbo .bullet-line,.ppt-td-nc .bullet-line,.dc-owner-cell .bullet-line{text-align:left}</style>
+.bullet-line{line-height:1.45;margin:1px 0}.ppt-td-ocp .bullet-line,.ppt-td-cbo .bullet-line,.ppt-td-nc .bullet-line,.dc-owner-cell .bullet-line{text-align:left}
+/* Sub-FT layer (v57) */
+.subft-banner{background:linear-gradient(135deg,#12376C,#296DB7);border-radius:8px;padding:18px 22px;color:#fff;margin-bottom:18px;box-shadow:0 6px 18px rgba(0,32,96,.18);display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.subft-banner-l{flex:1;min-width:280px}
+.subft-banner-eyebrow{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.7);margin-bottom:6px}
+.subft-banner-title{font-size:20px;font-weight:900;line-height:1.2}
+.subft-banner-sub{font-size:12px;color:rgba(255,255,255,.85);margin-top:6px;line-height:1.5}
+.subft-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.subftcard{background:#fff;border:1px solid var(--bdr);border-radius:8px;padding:16px;box-shadow:var(--shd);cursor:pointer;position:relative;overflow:hidden}
+.subftcard:before{content:'';position:absolute;left:0;top:0;width:4px;height:100%;background:var(--a2)}
+.subftcard.consolidado:before{background:var(--dk1)}
+.subftcard:hover{border-color:var(--a2);transform:translateY(-1px)}
+.subftcard-eyebrow{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);margin-bottom:4px}
+.subftcard-title{font-size:16px;font-weight:900;color:var(--dk1);margin-bottom:6px}
+.subftcard-meta{font-size:12px;color:var(--tx2);line-height:1.5}
+.subft-back-btn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:3px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:8px}
+.subft-back-btn:hover{background:rgba(255,255,255,.22)}
+.subft-bc-marker{}
+
+</style>
 <style id="decisions_log_css">
 /* ── Tooltip de histórico de decisões ── */
 #dc-log-tooltip{position:fixed;z-index:9999;background:#12376C;color:#fff;border-radius:6px;padding:12px 16px;font-size:12px;max-width:420px;min-width:240px;box-shadow:0 8px 32px rgba(0,32,96,.45);pointer-events:none;display:none;line-height:1.5;font-family:Nunito,Arial,sans-serif}
@@ -169,7 +189,7 @@ try { window.parent.postMessage({ type: 'ppr.ready' }, '*'); } catch(e) {}
 const PMI_SNAPSHOTS_API = "https://hgelha26b4.execute-api.us-east-1.amazonaws.com";
 const PMI_API_TOKEN = "pmi-token-2026";
 </script><div class="hdr"><div class="hdr-l"><span class="ht">GRADUS</span><div class="hdr-sep"></div><span class="ht" style="font-weight:600">Integração OceanPact + CBO</span><span class="hs" id="h-current">› Hub Multi-FT</span></div><div class="hdr-r"><button class="xbtn sec" id="btn-hub" onclick="(function(){try{currentFT=null;var tb=document.getElementById('tabbar');if(tb)tb.style.display='none';document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});var ph=document.getElementById('pg-hub');if(ph)ph.classList.add('active');if(typeof renderHub==='function')renderHub();if(typeof setHeader==='function')setHeader(null);if(typeof populateSelect==='function'&&typeof _allSnapshots!=='undefined'&&_allSnapshots.length)populateSelect(_allSnapshots,_activeSnapshotKey);}catch(e){alert('Erro Hub: '+e.message);}})()">🏠 Hub</button><span class="hbadge">PMI · Projeto América</span>
-<select id="pmi-snapshot-select" style="font-family:Nunito,Arial,sans-serif;font-size:12px;font-weight:700;padding:5px 10px;border-radius:3px;border:1px solid rgba(157,177,207,.4);background:#12376C;color:#fff;cursor:pointer;min-width:180px;max-width:240px" title="Selecionar versão do snapshot"><option value="">Carregando versões...</option></select><button id="pmi-snapshot-load" onclick="pmiCarregarSelecionada()" style="font-family:Nunito,Arial,sans-serif;font-size:12px;font-weight:700;padding:5px 12px;border-radius:3px;border:1px solid rgba(157,177,207,.4);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;display:none">⬇ Carregar</button><span id="h-progress" style="font-size:11px;color:rgba(157,177,207,.7)">Geral</span></div></div><div class="expbar"><button class="xbtn pri" id="btn-xlsx">📥 Exportar Base Completa</button><button class="xbtn sec" id="btn-csv">📋 Exportar Decisões CSV</button><button class="xbtn sec" id="btn-ft-html">💾 Backup HTML da FT</button><span class="exp-hint">Exporta a visão atual</span></div><div class="tabs-bar" id="tabbar"><div class="tab active" data-t="resumo">📊 Resumo Geral</div><div class="tab" data-t="qc">❓ Processos &amp; Questões</div><div class="tab" data-t="progresso">📈 Status dos Processos</div><div class="tab" data-t="contraste">⚖️ Contraste de Práticas</div><div class="tab" data-t="decisoes">✅ Painel de Decisões</div><div class="tab" data-t="raci">🧩 RACI To-be</div></div><div class="main"><div class="page active" id="pg-hub"></div><div class="page" id="pg-resumo"></div><div class="page" id="pg-qc"></div><div class="page" id="pg-progresso"></div><div class="page" id="pg-contraste"></div><div class="page" id="pg-decisoes"></div><div class="page" id="pg-raci"></div></div><div class="footer"><span>Gradus Consultoria | Integração OceanPact × CBO — Hub Multi-FT · v56</span><span>Fonte: Metodologia Gradus e arquivos das Forças-Tarefa</span></div><script>
+<select id="pmi-snapshot-select" style="font-family:Nunito,Arial,sans-serif;font-size:12px;font-weight:700;padding:5px 10px;border-radius:3px;border:1px solid rgba(157,177,207,.4);background:#12376C;color:#fff;cursor:pointer;min-width:180px;max-width:240px" title="Selecionar versão do snapshot"><option value="">Carregando versões...</option></select><button id="pmi-snapshot-load" onclick="pmiCarregarSelecionada()" style="font-family:Nunito,Arial,sans-serif;font-size:12px;font-weight:700;padding:5px 12px;border-radius:3px;border:1px solid rgba(157,177,207,.4);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;display:none">⬇ Carregar</button><span id="h-progress" style="font-size:11px;color:rgba(157,177,207,.7)">Geral</span></div></div><div class="expbar"><button class="xbtn pri" id="btn-xlsx">📥 Exportar Base Completa</button><button class="xbtn sec" id="btn-csv">📋 Exportar Decisões CSV</button><button class="xbtn sec" id="btn-ft-html">💾 Backup HTML da FT</button><span class="exp-hint">Exporta a visão atual</span></div><div class="tabs-bar" id="tabbar"><div class="tab active" data-t="resumo">📊 Resumo Geral</div><div class="tab" data-t="qc">❓ Processos &amp; Questões</div><div class="tab" data-t="progresso">📈 Status dos Processos</div><div class="tab" data-t="contraste">⚖️ Contraste de Práticas</div><div class="tab" data-t="decisoes">✅ Painel de Decisões</div><div class="tab" data-t="raci">🧩 RACI To-be</div></div><div class="main"><div class="page active" id="pg-hub"></div><div class="page" id="pg-resumo"></div><div class="page" id="pg-qc"></div><div class="page" id="pg-progresso"></div><div class="page" id="pg-contraste"></div><div class="page" id="pg-decisoes"></div><div class="page" id="pg-raci"></div></div><div class="footer"><span>Gradus Consultoria | Integração OceanPact × CBO — Hub Multi-FT · v57 · sub-FT layer</span><span>Fonte: Metodologia Gradus e arquivos das Forças-Tarefa</span></div><script>
 
 // DATA declared in head
 const PMI_API_URL = "/api/pmi-data";
@@ -3068,4 +3088,443 @@ function _dcHideTooltip() {
   }, 100);
 })();
 </script>
+
+
+<script id="subft_layer_v57">
+/* ============================================================
+   v57 — Camada de Sub-Força-Tarefa
+   Consome p.sub_forca_tarefa (processos) e q.sub_forca_tarefa (questões).
+   Calcula SUB_FT_INDEX em runtime quando DATA é carregado/trocado.
+   Permissões e renderers internos NÃO são tocados.
+   ============================================================ */
+(function(){
+
+  // Estado
+  window.currentParentFT = null;   // FT-pai real (do DATA.fts) ou null
+  window.currentSubFt    = null;   // nome da sub-FT ativa, '__consolidado__', ou null
+
+  // ─── Index de sub-FTs (recomputado on-demand a partir de DATA) ───
+  function computeSubFtIndex(){
+    var idx = {};
+    if(!window.DATA || !Array.isArray(DATA.fts)) return idx;
+    DATA.fts.forEach(function(ft){
+      var counts = {};
+      var order = [];
+      (ft.processos||[]).forEach(function(p){
+        var s = (p && p.sub_forca_tarefa) ? String(p.sub_forca_tarefa).trim() : '';
+        if(!s || s === '-') return;
+        if(!(s in counts)){ counts[s] = 0; order.push(s); }
+        counts[s]++;
+      });
+      var names = order.slice();
+      if(!names.length) return;
+      // Filtra trivialidade: 1 sub-FT com slug igual à FT-pai → ignora
+      function slug(s){ try{ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }catch(e){ return String(s||'').toLowerCase().trim(); } }
+      if(names.length === 1 && slug(names[0]) === slug(ft.nome)) return;
+      // Ordena por contagem desc, alfa
+      names.sort(function(a,b){ return (counts[b]-counts[a]) || a.localeCompare(b,'pt-BR'); });
+      idx[ft.nome] = names;
+    });
+    return idx;
+  }
+
+  function getSubFtIndex(){
+    // Recomputa sempre — barato (405 processos × 1 leitura) e à prova de
+    // troca de snapshot via select do header.
+    return computeSubFtIndex();
+  }
+  function hasSubFts(name){
+    var subs = getSubFtIndex()[name];
+    return Array.isArray(subs) && subs.length > 0;
+  }
+
+  // ─── Recalc helpers (mesma lógica de pesos do hub) ───
+  function _statusW(s){s=String(s||'');if(s==='Validado')return 100;if(s==='Finalizado')return 75;if(s==='Iniciado')return 25;return 0;}
+  function _isDone(s){return ['Finalizado','Validado'].indexOf(String(s||''))>=0;}
+  function _isPrio(p){return !!(p && (p.prioritario || Number(p.score_max||0)>=3));}
+  function _calcProg(list){if(!list||!list.length)return 0;var t=0;for(var i=0;i<list.length;i++)t+=_statusW(list[i].status);return t/list.length;}
+
+  function _recomputeAcompanhamento(processos, contrasteQs){
+    var c_proc      = {nao_iniciado:0, iniciado:0, finalizado:0, validado:0, progresso:0};
+    var c_proc_prio = {nao_iniciado:0, iniciado:0, finalizado:0, validado:0, progresso:0};
+    var c_q         = {nao_iniciado:0, iniciado:0, finalizado:0, validado:0, progresso:0};
+    var c_q_prio    = {nao_iniciado:0, iniciado:0, finalizado:0, validado:0, progresso:0};
+
+    function bucket(c, st){
+      var s = String(st||'');
+      if(s === 'Validado') c.validado++;
+      else if(s === 'Finalizado') c.finalizado++;
+      else if(s === 'Iniciado') c.iniciado++;
+      else c.nao_iniciado++;
+    }
+    function bucketProgress(c){
+      var tot = c.nao_iniciado + c.iniciado + c.finalizado + c.validado;
+      if(!tot){ c.progresso = 0; return; }
+      var soma = (c.iniciado*25) + (c.finalizado*75) + (c.validado*100);
+      c.progresso = Math.round((soma/tot)*10)/10;
+    }
+
+    (processos||[]).forEach(function(p){
+      bucket(c_proc, p.status);
+      if(_isPrio(p)) bucket(c_proc_prio, p.status);
+    });
+    (contrasteQs||[]).forEach(function(q){
+      bucket(c_q, q.Status||q.status);
+      var sc = Number(q.Score||q.score||0)||0;
+      if(sc>=3) bucket(c_q_prio, q.Status||q.status);
+    });
+    [c_proc, c_proc_prio, c_q, c_q_prio].forEach(bucketProgress);
+
+    var progresso_geral = _calcProg(processos||[]);
+    var prio_list       = (processos||[]).filter(_isPrio);
+    var progresso_prio  = _calcProg(prio_list);
+
+    return {
+      progresso_geral_ponderado:        Math.round(progresso_geral*10)/10,
+      progresso_priorizados_ponderado:  Math.round(progresso_prio*10)/10,
+      contraste_processos:              c_proc,
+      contraste_processos_priorizados:  c_proc_prio,
+      contraste_questoes:               c_q,
+      contraste_questoes_priorizadas:   c_q_prio
+    };
+  }
+
+  // ─── Constrói uma FT virtual filtrada por sub-FT ───
+  function buildFtView(parentFt, subFtName){
+    if(!parentFt) return null;
+    var procs   = (parentFt.processos||[]).slice();
+    var cqsAll  = parentFt.contraste_questoes || [];
+    var qsAll   = parentFt.questoes || [];
+    if(subFtName){
+      procs  = procs.filter(function(p){ return (p && p.sub_forca_tarefa) === subFtName; });
+      cqsAll = cqsAll.filter(function(q){ return (q && q.sub_forca_tarefa) === subFtName; });
+      qsAll  = qsAll.filter(function(q){ return (q && q.sub_forca_tarefa) === subFtName; });
+    }
+
+    var geral     = _calcProg(procs);
+    var prioList  = procs.filter(_isPrio);
+    var prioProg  = _calcProg(prioList);
+    var statusCounts = {'Não Iniciado':0,'Iniciado':0,'Finalizado':0,'Validado':0};
+    procs.forEach(function(p){
+      var s = p.status||'Não Iniciado';
+      if(s in statusCounts) statusCounts[s]++; else statusCounts['Não Iniciado']++;
+    });
+    var contrastCount = procs.filter(function(p){
+      return Object.keys(p.dimensoes||{}).length || (p.linhas||[]).length || p.ppt_text;
+    }).length;
+
+    var view = Object.assign({}, parentFt);
+    view.processos                = procs;
+    view.contraste_questoes       = cqsAll;
+    view.questoes                 = qsAll;
+    view.total_processos          = procs.length;
+    view.total_questoes           = cqsAll.length || qsAll.length
+                                    || procs.reduce(function(a,p){return a+((p.questoes||[]).length||p.total_questoes||0);},0);
+    view.questoes_prioritarias    = (cqsAll||[]).filter(function(q){return Number(q.Score||q.score||0)>=3;}).length
+                                    || (qsAll||[]).filter(function(q){return Number(q.Score||q.score||0)>=3;}).length;
+    view.progresso                = Math.round(geral*10)/10;
+    view.progresso_priorizados    = Math.round(prioProg*10)/10;
+    view.processos_com_contraste  = contrastCount;
+    view.processos_status_total   = procs.length;
+    view.status_counts            = statusCounts;
+    view.acompanhamento           = _recomputeAcompanhamento(procs, cqsAll);
+    view.progresso_geral          = view.progresso;
+    view.progresso_prioritarios   = view.progresso_priorizados;
+
+    if(subFtName){
+      view.__isSubFt       = true;
+      view.__parentFtName  = parentFt.nome;
+      view.__subFtName     = subFtName;
+      view.nome            = parentFt.nome + ' · ' + subFtName;
+      view.__originalNome  = parentFt.nome;
+    } else {
+      view.__isConsolidado = true;
+      view.__parentFtName  = parentFt.nome;
+    }
+    return view;
+  }
+
+  // ─── Painel da FT-pai (nível 2): cards de sub-FT no container pg-hub ───
+  function renderParentFtPanel(parentFt){
+    window.currentSubFt    = null;
+    window.currentParentFT = parentFt;
+    // currentFT lexical é null no nível-2 (igual ao Hub), pois ainda não escolheu sub-FT
+    try { currentFT = null; } catch(e){}
+    window.currentFT = null;
+
+    // Header
+    var hcur = document.getElementById('h-current');
+    if(hcur) hcur.textContent = '› FT ' + parentFt.nome + ' · Sub-FTs';
+    var hp = document.getElementById('h-progress');
+    if(hp) hp.textContent = (Math.round((parentFt.progresso||0)*10)/10).toFixed(1).replace('.',',') + '% concluído';
+
+    // Esconde tabbar; usa pg-hub como container
+    var tb = document.getElementById('tabbar');
+    if(tb) tb.style.display = 'none';
+    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+    var hubPage = document.getElementById('pg-hub');
+    if(hubPage) hubPage.classList.add('active');
+
+    // Limpa as outras páginas
+    ['resumo','qc','progresso','contraste','decisoes','raci'].forEach(function(tabId){
+      var el = document.getElementById('pg-'+tabId);
+      if(el) el.innerHTML = '';
+    });
+
+    var subs = getSubFtIndex()[parentFt.nome] || [];
+    var cardsHtml = '';
+    subs.forEach(function(sub){
+      var view = buildFtView(parentFt, sub);
+      cardsHtml += (
+        '<div class="subftcard" data-subft="'+esc(sub)+'">'+
+          '<div class="subftcard-eyebrow">Sub-FT</div>'+
+          '<div class="subftcard-title">'+esc(sub)+'</div>'+
+          '<div class="subftcard-meta">'+
+            '<b>'+pct(view.progresso)+'</b> de avanço · '+
+            '<b>'+pct(view.progresso_priorizados)+'</b> prioritários<br>'+
+            view.total_processos+' processos · '+view.total_questoes+' questões<br>'+
+            view.processos_com_contraste+' processos com contraste'+
+          '</div>'+
+          '<div class="progbg" style="margin-top:10px"><div class="progfill" style="width:'+view.progresso+'%"></div></div>'+
+        '</div>'
+      );
+    });
+    cardsHtml += (
+      '<div class="subftcard consolidado" data-subft="__consolidado__">'+
+        '<div class="subftcard-eyebrow">Consolidado</div>'+
+        '<div class="subftcard-title">Visão consolidada da FT</div>'+
+        '<div class="subftcard-meta">'+
+          '<b>'+pct(parentFt.progresso)+'</b> de avanço · '+
+          '<b>'+pct(parentFt.progresso_priorizados||0)+'</b> prioritários<br>'+
+          parentFt.total_processos+' processos · '+parentFt.total_questoes+' questões<br>'+
+          'Todos os processos da FT '+esc(parentFt.nome)+
+        '</div>'+
+        '<div class="progbg" style="margin-top:10px"><div class="progfill" style="width:'+parentFt.progresso+'%"></div></div>'+
+      '</div>'
+    );
+
+    var prioProc = (parentFt.processos||[]).filter(_isPrio);
+    var prioProg = _calcProg(prioProc);
+    var doneAll  = (parentFt.processos||[]).filter(function(p){return _isDone(p.status);}).length;
+    var donePrio = prioProc.filter(function(p){return _isDone(p.status);}).length;
+
+    var ftPanelHtml = (
+      '<div class="subft-banner">'+
+        '<div class="subft-banner-l">'+
+          '<div class="subft-banner-eyebrow">FT '+esc(parentFt.nome)+' · Painel de Sub-Forças-Tarefa</div>'+
+          '<div class="subft-banner-title">Selecione a sub-FT para ver apenas seus dados</div>'+
+          '<div class="subft-banner-sub">A visão consolidada mostra todos os processos e questões da FT. Cada sub-FT filtra processos e questões pelo campo <code>sub_forca_tarefa</code>. Permissões e abas internas permanecem inalteradas.</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="execdash">'+
+        '<div class="exec-hero">'+
+          '<div>'+
+            '<div class="exec-eyebrow">FT '+esc(parentFt.nome)+' · Painel Geral</div>'+
+            '<div class="exec-title">Avanço consolidado da FT</div>'+
+            '<div class="exec-copy">Indicadores consolidados de todas as sub-FTs. Para filtrar uma sub-FT específica, clique em um dos cards abaixo.</div>'+
+          '</div>'+
+          '<div class="exec-bigrow">'+
+            '<div class="exec-big"><div class="exec-big-val">'+pct(parentFt.progresso)+'</div><div class="exec-big-lbl">Avanço geral</div></div>'+
+            '<div class="exec-big"><div class="exec-big-val">'+pct(prioProg)+'</div><div class="exec-big-lbl">Avanço prioritários</div></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="exec-metrics">'+
+          '<div class="exec-card blue"><div class="exec-card-val">'+parentFt.total_processos+'</div><div class="exec-card-lbl">Processos</div><div class="exec-card-sub">Total da FT</div></div>'+
+          '<div class="exec-card orange"><div class="exec-card-val">'+parentFt.total_questoes+'</div><div class="exec-card-lbl">Questões-chave</div><div class="exec-card-sub">Base da FT</div></div>'+
+          '<div class="exec-card green"><div class="exec-card-val">'+doneAll+'</div><div class="exec-card-lbl">Finalizados / validados</div><div class="exec-card-sub">Status final</div></div>'+
+          '<div class="exec-card red"><div class="exec-card-val">'+donePrio+'/'+prioProc.length+'</div><div class="exec-card-lbl">Prioritários finalizados</div><div class="exec-card-sub">Base crítica</div></div>'+
+          '<div class="exec-card"><div class="exec-card-val">'+(parentFt.status_counts && parentFt.status_counts['Iniciado']||0)+'</div><div class="exec-card-lbl">Iniciados</div><div class="exec-card-sub">Peso 25%</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="progwrap">'+
+        '<div class="progtitle">Avanço geral da FT</div>'+
+        '<div class="progbg"><div class="progfill" style="width:'+parentFt.progresso+'%"></div></div>'+
+        '<div class="progtitle" style="margin-top:14px">Avanço dos processos prioritários</div>'+
+        '<div class="progbg"><div class="progfill" style="width:'+prioProg+'%"></div></div>'+
+      '</div>'+
+      '<div style="font-size:12px;font-weight:800;color:var(--dk1);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 12px">Selecione uma sub-FT ou veja a consolidada</div>'+
+      '<div class="subft-grid">'+cardsHtml+'</div>'
+    );
+
+    var elTarget = document.getElementById('pg-hub');
+    elTarget.innerHTML = ftPanelHtml;
+
+    elTarget.querySelectorAll('.subftcard[data-subft]').forEach(function(card){
+      card.addEventListener('click', function(){
+        var key = card.getAttribute('data-subft');
+        try {
+          if(key === '__consolidado__'){
+            openParentConsolidado(parentFt);
+          } else {
+            openSubFt(parentFt, key);
+          }
+        } catch(e){
+          console.error('[v57] erro ao abrir sub-FT', key, e);
+          alert('Erro ao abrir sub-FT: ' + (e && e.message ? e.message : e));
+        }
+      });
+    });
+
+    window.scrollTo(0,0);
+  }
+
+  // ─── Abre sub-FT (FT virtual filtrada) ou consolidado ───
+  function _enterFt(parentFt, view, subFtLabel){
+    // ATENÇÃO: currentFT é declarado com 'let' no escopo global do script.
+    // Atribuição sem prefixo atinge a binding lexical correta;
+    // window.currentFT sozinho NÃO funciona para o resto do código.
+    currentFT = view;
+    window.currentFT = view;
+    try { _dcFiltro = 'Todos'; } catch(e){}
+
+    setHeaderForSubFt(parentFt, subFtLabel);
+
+    var hubPage = document.getElementById('pg-hub');
+    if(hubPage) hubPage.classList.remove('active');
+
+    var tb = document.getElementById('tabbar');
+    if(tb) tb.style.display = 'flex';
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    var t0 = document.querySelector('.tab[data-t="resumo"]');
+    if(t0) t0.classList.add('active');
+
+    if(typeof window.renderFT === 'function')      window.renderFT();
+    else if(typeof renderFT === 'function')        renderFT();
+
+    injectSubFtBreadcrumb();
+
+    if(typeof window.showPage === 'function')      window.showPage('resumo');
+    else if(typeof showPage === 'function')        showPage('resumo');
+
+    window.scrollTo(0,0);
+  }
+
+  function openSubFt(parentFt, subFtName){
+    try {
+      window.currentParentFT = parentFt;
+      window.currentSubFt    = subFtName;
+      var view = buildFtView(parentFt, subFtName);
+      _enterFt(parentFt, view, subFtName);
+    } catch(e){
+      console.error('[v57] openSubFt error', e);
+      alert('Erro ao abrir sub-FT ' + subFtName + ': ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function openParentConsolidado(parentFt){
+    try {
+      window.currentParentFT = parentFt;
+      window.currentSubFt    = '__consolidado__';
+      _enterFt(parentFt, parentFt, null);
+    } catch(e){
+      console.error('[v57] openParentConsolidado error', e);
+      alert('Erro ao abrir visão consolidada: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function setHeaderForSubFt(parentFt, subFtName){
+    var hcur = document.getElementById('h-current');
+    if(hcur){
+      if(subFtName){
+        hcur.textContent = '› FT ' + parentFt.nome + ' › ' + subFtName;
+      } else {
+        hcur.textContent = '› FT ' + parentFt.nome + ' · Consolidado';
+      }
+    }
+    var hp = document.getElementById('h-progress');
+    if(hp){
+      var v = (typeof currentFT !== 'undefined' && currentFT) ? currentFT.progresso : (parentFt && parentFt.progresso);
+      if(typeof v === 'number'){
+        hp.textContent = (Math.round(v*10)/10).toFixed(1).replace('.',',') + '% concluído';
+      }
+    }
+  }
+
+  // ─── Breadcrumb + botão voltar — re-injetado a cada showPage em modo sub-FT ───
+  function injectSubFtBreadcrumb(){
+    if(!window.currentParentFT) return;
+    var parentName = window.currentParentFT.nome;
+    var subLabel   = (window.currentSubFt && window.currentSubFt !== '__consolidado__')
+                       ? window.currentSubFt : 'Consolidado';
+    var bcHtml = (
+      '<div class="ins" style="background:#FFF3DE;border-left-color:#E68E18;display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
+        '<button class="subft-back-btn" style="background:var(--dk1);color:#fff;border-color:var(--dk1)" onclick="window.__pmiBackToFtPanel()">← Painel FT '+esc(parentName)+'</button>'+
+        '<span style="font-size:12px;color:var(--dk1);font-weight:700">FT <b>'+esc(parentName)+'</b> › Sub-FT <b>'+esc(subLabel)+'</b></span>'+
+        '<span style="font-size:11px;color:var(--tx3);margin-left:auto">Dados filtrados pela sub-FT</span>'+
+      '</div>'
+    );
+    ['resumo','qc','progresso','contraste','decisoes','raci'].forEach(function(tabId){
+      var el = document.getElementById('pg-'+tabId);
+      if(!el) return;
+      var prev = el.querySelector('.subft-bc-marker');
+      if(prev) prev.remove();
+      var wrap = document.createElement('div');
+      wrap.className = 'subft-bc-marker';
+      wrap.innerHTML = bcHtml;
+      el.insertBefore(wrap, el.firstChild);
+    });
+  }
+
+  window.__pmiBackToFtPanel = function(){
+    if(window.currentParentFT) renderParentFtPanel(window.currentParentFT);
+  };
+
+  // ─── Override de openFT: intercepta FTs com sub-FT ───
+  var _originalOpenFT = window.openFT;
+  window.openFT = function(name){
+    // Permissões — delega ao original (que mostra tela de acesso negado)
+    if(typeof canViewFT === 'function' && !canViewFT(name)){
+      if(_originalOpenFT) return _originalOpenFT(name);
+    }
+    if(hasSubFts(name)){
+      var ft = (DATA.fts||[]).find(function(f){ return f.nome === name; });
+      if(!ft){ if(_originalOpenFT) return _originalOpenFT(name); return; }
+      window.currentSubFt = null;
+      renderParentFtPanel(ft);
+      return;
+    }
+    // FT sem sub-FT: comportamento original
+    window.currentParentFT = null;
+    window.currentSubFt    = null;
+    if(_originalOpenFT) return _originalOpenFT(name);
+  };
+
+  // ─── Override de showHub: limpa estado de sub-FT ───
+  var _originalShowHub = window.showHub;
+  window.showHub = function(){
+    window.currentParentFT = null;
+    window.currentSubFt    = null;
+    try { currentFT = null; } catch(e){}
+    window.currentFT = null;
+    if(_originalShowHub) return _originalShowHub();
+    // Fallback
+    var tb = document.getElementById('tabbar'); if(tb) tb.style.display='none';
+    document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+    document.getElementById('pg-hub').classList.add('active');
+    if(typeof renderHub === 'function') renderHub();
+    if(typeof setHeader  === 'function') setHeader(null);
+  };
+
+  // ─── Override de showPage: re-injeta breadcrumb se estiver em sub-FT ───
+  var _originalShowPage = window.showPage;
+  window.showPage = function(t){
+    var r;
+    if(typeof _originalShowPage === 'function'){
+      r = _originalShowPage(t);
+    } else {
+      document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+      var pg = document.getElementById('pg-'+t);
+      if(pg) pg.classList.add('active');
+      document.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('active', x.dataset.t === t);});
+    }
+    if(window.currentParentFT && window.currentSubFt !== null){
+      try { injectSubFtBreadcrumb(); } catch(e){ console.warn('breadcrumb re-inject failed', e); }
+    }
+    return r;
+  };
+
+  console.log('[v57] Sub-FT layer ativo.');
+})();
+</script>
+
 </body></html>
