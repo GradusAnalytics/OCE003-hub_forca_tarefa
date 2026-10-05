@@ -1,0 +1,166 @@
+{
+  "versao_manifest": 1,
+  "ferramenta": {
+    "codigo": "oce003_hub_forca_tarefa",
+    "nome": "Hub Multi-FT — PMI OceanPact × CBO",
+    "repositorio": "GradusAnalytics/OCE003-hub_forca_tarefa",
+    "descricao": "Dados das Forças-Tarefa do PMI OceanPact × CBO (snapshots versionadas no S3) e registro de decisões por processo"
+  },
+  "servico": {
+    "porta": null,
+    "url_base": "https://hgelha26b4.execute-api.us-east-1.amazonaws.com",
+    "prefixo_upstream": "/",
+    "rota_ppr": null,
+    "saude": { "caminho": "/snapshots/active-config", "status_esperado": 200 }
+  },
+  "identidade": {
+    "cabecalho_email": null,
+    "cabecalho_nome": null,
+    "cabecalhos_segredos": ["X-Api-Token"]
+  },
+  "operacoes": [
+    {
+      "codigo": "config_ativa",
+      "nome": "Ver snapshot ativa",
+      "descricao": "Keys da snapshot e da base de permissões que o Hub carrega (active.json, Lambda pmi-get-active-config)",
+      "efeito": "leitura",
+      "metodo": "GET",
+      "caminho": "/snapshots/active-config",
+      "corpo": null,
+      "timeout_s": 20,
+      "entradas": [],
+      "saidas": [
+        {
+          "codigo": "snapshot_key",
+          "nome": "Snapshot ativa",
+          "tipo": "texto_curto",
+          "origem": "/snapshot_key",
+          "descricao": "Key no S3 da snapshot ativa"
+        },
+        {
+          "codigo": "acesso_key",
+          "nome": "Base de permissões ativa",
+          "tipo": "texto_curto",
+          "origem": "/acesso_key",
+          "descricao": "Key no S3 do Excel de gestão de acesso"
+        }
+      ]
+    },
+    {
+      "codigo": "listar_snapshots",
+      "nome": "Listar snapshots",
+      "descricao": "Versões disponíveis em snapshots/ (Lambda pmi-list-snapshots)",
+      "efeito": "leitura",
+      "metodo": "GET",
+      "caminho": "/snapshots",
+      "corpo": null,
+      "timeout_s": 20,
+      "entradas": [],
+      "saidas": [
+        {
+          "codigo": "snapshots",
+          "nome": "Snapshots",
+          "tipo": "tabela",
+          "origem": "/snapshots",
+          "descricao": "key, name, size_bytes e created_at, da mais recente para a mais antiga"
+        }
+      ]
+    },
+    {
+      "codigo": "url_snapshot",
+      "nome": "Link da snapshot",
+      "descricao": "URL pré-assinada do S3 para baixar o JSON de uma snapshot (fts e meta); sem key, a ativa (Lambda pmi-get-snapshot)",
+      "efeito": "leitura",
+      "metodo": "GET",
+      "caminho": "/snapshots/data",
+      "corpo": null,
+      "timeout_s": 20,
+      "entradas": [
+        {
+          "codigo": "key",
+          "nome": "Key da snapshot",
+          "tipo": "texto_curto",
+          "onde": "query",
+          "obrigatorio": false,
+          "padrao": null,
+          "opcoes": [],
+          "descricao": "Por exemplo snapshots/snapshot_v31.json. Vazio = snapshot ativa"
+        }
+      ],
+      "saidas": [
+        {
+          "codigo": "presigned_url",
+          "nome": "URL de download",
+          "tipo": "texto_curto",
+          "origem": "/presigned_url",
+          "descricao": "URL pré-assinada (GET) do JSON no S3"
+        },
+        {
+          "codigo": "key",
+          "nome": "Key da snapshot",
+          "tipo": "texto_curto",
+          "origem": "/key",
+          "descricao": "Key efetivamente resolvida"
+        }
+      ]
+    },
+    {
+      "codigo": "ler_decisoes",
+      "nome": "Ler log de decisões",
+      "descricao": "Todas as entradas do decisions_log.json, em ordem de gravação (Lambda pmi-decision-log)",
+      "efeito": "leitura",
+      "metodo": "GET",
+      "caminho": "/decisions/log",
+      "corpo": null,
+      "timeout_s": 20,
+      "entradas": [],
+      "saidas": [
+        {
+          "codigo": "log",
+          "nome": "Decisões",
+          "tipo": "tabela",
+          "origem": "/log",
+          "descricao": "chave, ft, processo, item, usuario, resposta, alternativa, obs, timestamp e, quando houver, decision_key, tema e questao_chave"
+        },
+        {
+          "codigo": "meta",
+          "nome": "Metadados",
+          "tipo": "json",
+          "origem": "/meta",
+          "descricao": "Metadados do log, como total_entries"
+        }
+      ]
+    },
+    {
+      "codigo": "registrar_decisoes",
+      "nome": "Registrar decisões",
+      "descricao": "Acrescenta entradas ao decisions_log.json; nunca sobrescreve as existentes, a mais recente de cada chave vale (Lambda pmi-decision-log)",
+      "efeito": "escrita",
+      "metodo": "POST",
+      "caminho": "/decisions/log",
+      "corpo": "json",
+      "timeout_s": 30,
+      "entradas": [
+        {
+          "codigo": "entries",
+          "nome": "Entradas",
+          "tipo": "json",
+          "onde": "corpo",
+          "obrigatorio": true,
+          "padrao": null,
+          "opcoes": [],
+          "descricao": "Lista de objetos {chave, ft, processo, item, usuario, resposta, alternativa, obs, timestamp ISO 8601}, com decision_key, tema e questao_chave opcionais"
+        }
+      ],
+      "saidas": [
+        {
+          "codigo": "resultado",
+          "nome": "Resultado",
+          "tipo": "json",
+          "origem": "",
+          "descricao": "Resposta da Lambda"
+        }
+      ]
+    }
+  ]
+}
